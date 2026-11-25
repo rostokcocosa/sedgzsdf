@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>DeFi Wallet</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg:      var(--tg-theme-bg-color,            #18191c);
+  --bg2:     var(--tg-theme-secondary-bg-color,   #232527);
+  --text:    var(--tg-theme-text-color,           #f0f0f0);
+  --hint:    var(--tg-theme-hint-color,           #8e9199);
+  --btn:     var(--tg-theme-button-color,         #2b6be6);
+  --btnT:    var(--tg-theme-button-text-color,    #ffffff);
+  --danger:  var(--tg-theme-destructive-text-color,#e05151);
+  --green:   #3ec97a;
+  --yellow:  #f0a500;
+  --radius:  12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);color:var(--text);font-size:15px;line-height:1.4;
+  min-height:100vh;overflow-x:hidden}
+
+/* ── layout ── */
+.screen{display:none;min-height:100vh}
+.screen.active{display:block}
+.page{padding:16px 16px 80px}
+.scroll{overflow-y:auto;max-height:calc(100vh - 56px - 80px)}
+
+/* ── cards ── */
+.card{background:var(--bg2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card h3{font-size:14px;font-weight:600;color:var(--hint);text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:12px}
+
+/* ── buttons ── */
+.btn{display:block;width:100%;background:var(--btn);color:var(--btnT);border:none;
+  border-radius:10px;padding:13px 16px;font-size:16px;font-weight:600;cursor:pointer;
+  text-align:center;transition:opacity .15s}
+.btn:active{opacity:.75}
+.btn:disabled{opacity:.4;cursor:default}
+.btn-sm{padding:8px 14px;font-size:14px;width:auto;display:inline-block;border-radius:8px}
+.btn-sec{background:var(--bg2);color:var(--text);border:1px solid rgba(255,255,255,.12)}
+.btn-danger{background:var(--danger)}
+.btn-green{background:var(--green);color:#fff}
+.row-btns{display:flex;gap:8px;margin-top:8px}
+.row-btns .btn{flex:1}
+
+/* ── inputs ── */
+.input{background:var(--bg);color:var(--text);border:1.5px solid transparent;
+  border-radius:10px;padding:12px;font-size:15px;width:100%;outline:none;
+  transition:border-color .2s}
+.input:focus{border-color:var(--btn)}
+.input::placeholder{color:var(--hint)}
+select.input{cursor:pointer;appearance:none;background-image:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%238e9199' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;color:var(--hint);margin-bottom:5px;font-weight:500}
+textarea.input{resize:vertical;min-height:70px}
+
+/* ── bottom nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);
+  display:flex;border-top:1px solid rgba(255,255,255,.08);z-index:100;
+  padding-bottom:env(safe-area-inset-bottom)}
+.nav-item{flex:1;padding:9px 4px 7px;display:flex;flex-direction:column;
+  align-items:center;cursor:pointer;color:var(--hint);font-size:10px;
+  font-weight:500;gap:2px;transition:color .15s}
+.nav-item.active{color:var(--btn)}
+.nav-icon{font-size:22px;line-height:1}
+
+/* ── header ── */
+.wallet-header{background:linear-gradient(135deg,var(--btn) 0%,#1a4cbf 100%);
+  border-radius:var(--radius);padding:20px;margin-bottom:12px;position:relative}
+.wallet-addr{font-family:monospace;font-size:12px;color:rgba(255,255,255,.75);
+  word-break:break-all;margin-bottom:4px}
+.wallet-copy{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);
+  border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+
+/* ── balance grid ── */
+.bal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.bal-item{background:var(--bg2);border-radius:var(--radius);padding:12px 10px;text-align:center}
+.bal-icon{font-size:22px}
+.bal-name{font-size:11px;color:var(--hint);margin:2px 0}
+.bal-val{font-size:14px;font-weight:700}
+
+/* ── history ── */
+.tx-list{display:flex;flex-direction:column;gap:1px}
+.tx-item{display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.tx-item:last-child{border-bottom:none}
+.tx-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:17px;flex-shrink:0}
+.tx-icon.in {background:rgba(62,201,122,.15)}
+.tx-icon.out{background:rgba(224,81,81,.15)}
+.tx-icon.swap{background:rgba(240,165,0,.15)}
+.tx-info{flex:1;min-width:0}
+.tx-label{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-sub  {font-size:12px;color:var(--hint)}
+.tx-amt{text-align:right;font-weight:600;font-size:14px}
+.tx-amt.in {color:var(--green)}
+.tx-amt.out{color:var(--danger)}
+
+/* ── badges ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-buy {background:rgba(62,201,122,.2);color:var(--green)}
+.badge-sell{background:rgba(224,81,81,.2); color:var(--danger)}
+.badge-pending{background:rgba(240,165,0,.2);color:var(--yellow)}
+.badge-paid   {background:rgba(62,201,122,.2);color:var(--green)}
+
+/* ── seed display ── */
+.seed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
+.seed-word{background:var(--bg2);border-radius:8px;padding:8px 6px;text-align:center}
+.seed-word span{font-size:10px;color:var(--hint);display:block}
+.seed-word b{font-size:14px}
+.seed-box{background:var(--bg2);border-radius:var(--radius);padding:14px;
+  font-family:monospace;font-size:14px;word-break:break-all;line-height:1.6;
+  margin:8px 0;color:var(--text)}
+
+/* ── connect screen ── */
+.connect-wrap{display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;padding:40px 20px 20px;min-height:100vh}
+.connect-logo{font-size:64px;margin-bottom:16px}
+.connect-title{font-size:24px;font-weight:700;margin-bottom:8px}
+.connect-hint{color:var(--hint);text-align:center;margin-bottom:28px;font-size:14px}
+.connect-wrap .card{width:100%;max-width:400px}
+.divider{text-align:center;color:var(--hint);margin:12px 0;font-size:13px}
+
+/* ── QR modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+  display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--bg2);border-radius:16px;padding:24px;width:280px;text-align:center}
+.modal-box h3{margin-bottom:16px;font-size:16px}
+.modal-box img{border-radius:8px;background:#fff;padding:8px;width:200px;height:200px}
+.modal-addr{font-family:monospace;font-size:11px;color:var(--hint);
+  word-break:break-all;margin:10px 0}
+.modal-close{margin-top:14px}
+
+/* ── P2P order card ── */
+.order-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin-bottom:8px}
+.order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.order-info{font-size:13px;color:var(--hint);margin-bottom:6px}
+.order-price{font-size:16px;font-weight:700}
+
+/* ── swap widget ── */
+.swap-wrap{position:relative}
+.swap-arrow{text-align:center;font-size:22px;padding:4px;cursor:pointer;user-select:none}
+.rate-info{background:var(--bg);border-radius:8px;padding:10px 12px;
+  font-size:13px;color:var(--hint);margin-top:6px;text-align:center}
+
+/* ── result box ── */
+.result-box{background:var(--bg);border-radius:var(--radius);padding:14px;
+  font-size:14px;margin:10px 0;word-break:break-all}
+.result-box code{font-family:monospace;color:var(--btn);font-size:15px}
+
+/* ── toast ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:rgba(0,0,0,.85);color:#fff;padding:10px 18px;border-radius:20px;
+  font-size:14px;opacity:0;transition:all .3s;z-index:300;white-space:nowrap;
+  pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok  {background:#2a7a4b}
+#toast.err {background:#8b2a2a}
+
+/* ── dev banner ── */
+#dev-banner{background:#2c2200;border:1px solid #6b4a00;border-radius:8px;
+  padding:10px 14px;font-size:12px;color:#f0a500;margin-bottom:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- ══ Экран подключения ══ -->
+<div id="screen-connect" class="screen">
+<div class="connect-wrap">
+  <div class="connect-logo">💎</div>
+  <div class="connect-title">DeFi Wallet</div>
+  <div class="connect-hint">Подключите или создайте тестовый кошелёк</div>
+
+  <div id="dev-banner" style="display:none">
+    ⚠️ Браузерный режим — initData не передаётся. Установите <b>DEV_MODE=true</b> для тестирования.
+  </div>
+
+  <div class="card" style="max-width:420px;width:100%">
+    <h3>Существующий кошелёк</h3>
+    <div class="field">
+      <label>Seed-фраза (12 или 24 слова)</label>
+      <textarea id="seed-input" class="input" rows="3" placeholder="word1 word2 word3 …"></textarea>
+    </div>
+    <button class="btn" id="btn-connect" onclick="connectSeed()">Подключить</button>
+  </div>
+
+  <div class="divider">— или —</div>
+
+  <button class="btn btn-sec" style="max-width:420px;width:100%" onclick="requestGenerate()">
+    ✨ Создать новый кошелёк
+  </button>
+</div>
+</div>
+
+<!-- ══ Экран новой seed-фразы ══ -->
+<div id="screen-newseed" class="screen">
+<div class="page">
+  <div style="text-align:center;padding:16px 0 10px">
+    <div style="font-size:40px">⚠️</div>
+    <div style="font-size:18px;font-weight:700;margin:8px 0">Запишите seed-фразу</div>
+    <div style="color:var(--hint);font-size:14px">Это единственный способ восстановить кошелёк.<br>Никогда не передавайте её никому.</div>
+  </div>
+  <div id="seed-words-grid" class="seed-grid"></div>
+  <div class="card">
+    <h3>Полная фраза</h3>
+    <div id="seed-full" class="seed-box"></div>
+    <button class="btn btn-sm btn-sec" onclick="copySeed()" style="margin-top:4px">📋 Скопировать</button>
+  </div>
+  <button class="btn btn-green" onclick="confirmNewSeed()">✅ Я сохранил(а) — продолжить</button>
+</div>
+</div>
+
+<!-- ══ Главный экран ══ -->
+<div id="screen-app" class="screen">
+
+  <!-- Вкладка: Кошелёк -->
+  <div id="tab-wallet" class="tab-content active" style="display:block">
+  <div class="page">
+    <div id="dev-banner-app" style="display:none" class="card">
+      <span style="color:var(--yellow);font-size:13px">⚠️ Режим разработки (DEV_MODE=true)</span>
+    </div>
+
+    <div class="wallet-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">TON адрес</div>
+        <span id="mode-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;
+          background:rgba(255,255,255,.2);display:none"></span>
+      </div>
+      <div class="wallet-addr" id="hdr-addr">—</div>
+      <button class="wallet-copy" onclick="copyAddr()">Копировать</button>
+      <div id="eth-addr-row" style="display:none;margin-top:8px">
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">ETH адрес</div>
+        <div class="wallet-addr" id="hdr-eth-addr" style="font-size:11px">—</div>
+        <button onclick="copyEthAddr()" style="margin-top:4px;background:rgba(255,255,255,.15);
+          border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Копировать</button>
+      </div>
+      <div id="btc-addr-row" style="display:none;margin-top:8px">
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">BTC адрес (SegWit)</div>
+        <div class="wallet-addr" id="hdr-btc-addr" style="font-size:11px">—</div>
+        <button onclick="copyBtcAddr()" style="margin-top:4px;background:rgba(255,255,255,.15);
+          border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Копировать</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button onclick="showQR()" style="background:rgba(255,255,255,.15);
+          border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer">
+          📷 QR
+        </button>
+        <button id="btn-refresh" onclick="refreshBalances()" style="background:rgba(255,255,255,.15);
+          border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:none">
+          🔄 Обновить
+        </button>
+        <button onclick="toggleAddrOverride()" style="background:rgba(255,255,255,.12);
+          border:none;color:rgba(255,255,255,.8);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">
+          ✏️ Адрес вручную
+        </button>
+      </div>
+    </div>
+
+    <!-- Форма ручного ввода адреса -->
+    <div id="addr-override" class="card" style="display:none">
+      <h3>Ввести адрес вручную</h3>
+      <p style="font-size:12px;color:var(--hint);margin-bottom:10px">
+        Если деривация адреса не совпала с вашим кошельком — введите адрес сюда, балансы обновятся.
+      </p>
+      <div class="field"><label>TON адрес</label>
+        <input id="ov-ton" class="input" placeholder="EQ…"></div>
+      <div class="field"><label>EVM адрес (ETH / BNB)</label>
+        <input id="ov-eth" class="input" placeholder="0x…"></div>
+      <div class="field"><label>BTC адрес (native SegWit)</label>
+        <input id="ov-btc" class="input" placeholder="bc1q…"></div>
+      <div class="row-btns">
+        <button class="btn" onclick="applyAddrOverride()">Применить</button>
+        <button class="btn btn-sec" onclick="toggleAddrOverride()">Отмена</button>
+      </div>
+    </div>
+
+    <div class="bal-grid" id="bal-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="bal-item"><div class="bal-icon">💎</div><div class="bal-name">TON</div><div class="bal-val" id="b-TON">0</div></div>
+      <div class="bal-item"><div class="bal-icon">💵</div><div class="bal-name">USDT</div><div class="bal-val" id="b-USDT">0</div></div>
+      <div class="bal-item"><div class="bal-icon">⟠</div><div class="bal-name">ETH</div><div class="bal-val" id="b-ETH">0</div></div>
+      <div class="bal-item"><div class="bal-icon">🟡</div><div class="bal-name">BNB</div><div class="bal-val" id="b-BNB">0</div></div>
+      <div class="bal-item"><div class="bal-icon">₿</div><div class="bal-name">BTC</div><div class="bal-val" id="b-BTC">0</div></div>
+    </div>
+
+    <div class="row-btns">
+      <button class="btn btn-green" onclick="openDeposit()">↓ Пополнить</button>
+      <button class="btn btn-sec"   onclick="openWithdraw()">↑ Вывести</button>
+    </div>
+
+    <!-- Deposit form -->
+    <div id="deposit-form" class="card" style="display:none;margin-top:12px">
+      <h3>Тестовое пополнение</h3>
+      <div class="field"><label>Актив</label>
+        <select id="dep-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Сумма</label>
+        <input id="dep-amount" class="input" type="number" min="0.001" step="any" value="10" placeholder="Сумма"></div>
+      <div class="row-btns">
+        <button class="btn" onclick="doDeposit()">Зачислить</button>
+        <button class="btn btn-sec" onclick="closeDeposit()">Отмена</button>
+      </div>
+    </div>
+
+    <!-- Withdraw form -->
+    <div id="withdraw-form" class="card" style="display:none;margin-top:12px">
+      <h3>Вывод средств</h3>
+      <div class="field"><label>Актив</label>
+        <select id="wd-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Адрес получателя</label>
+        <input id="wd-addr" class="input" placeholder="EQ…"></div>
+      <div class="field"><label>Сумма</label>
+        <input id="wd-amount" class="input" type="number" min="0.001" step="any" placeholder="Сумма"></div>
+      <div class="row-btns">
+        <button class="btn btn-danger" onclick="doWithdraw()">Вывести</button>
+        <button class="btn btn-sec" onclick="closeWithdraw()">Отмена</button>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card" style="margin-top:12px">
+      <h3>История операций</h3>
+      <div id="tx-list"><div style="color:var(--hint);font-size:14px;text-align:center;padding:16px">Нет операций</div></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Вкладка: Переводы и чеки -->
+  <div id="tab-transfer" class="tab-content" style="display:none">
+  <div class="page">
+    <div class="card">
+      <h3>Перевод по адресу</h3>
+      <div class="field"><label>Актив</label>
+        <select id="tr-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Адрес получателя</label>
+        <input id="tr-addr" class="input" placeholder="EQ…"></div>
+      <div class="field"><label>Сумма</label>
+        <input id="tr-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
+      <div class="field"><label>Комментарий (необязательно)</label>
+        <input id="tr-comment" class="input" placeholder="…"></div>
+      <button class="btn" onclick="doTransfer()">Отправить</button>
+    </div>
+
+    <div class="card">
+      <h3>Создать чек</h3>
+      <div class="field"><label>Актив</label>
+        <select id="ch-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Сумма</label>
+        <input id="ch-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
+      <div class="field"><label>Комментарий</label>
+        <input id="ch-comment" class="input" placeholder="…"></div>
+      <button class="btn" onclick="createCheck()">Создать чек</button>
+      <div id="check-result" style="display:none" class="result-box">
+        Код чека: <code id="check-code"></code>
+        <button class="btn btn-sm btn-sec" style="margin-top:8px" onclick="copyCheckCode()">📋 Скопировать код</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Активировать чек</h3>
+      <div class="field"><label>Код чека</label>
+        <input id="act-code" class="input" placeholder="Вставьте код…"></div>
+      <button class="btn btn-green" onclick="activateCheck()">Получить</button>
+      <div id="check-info" style="display:none;margin-top:10px;font-size:14px;color:var(--hint)"></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Вкладка: Счета -->
+  <div id="tab-invoice" class="tab-content" style="display:none">
+  <div class="page">
+    <div class="card">
+      <h3>Выставить счёт</h3>
+      <div class="field"><label>Валюта</label>
+        <select id="inv-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Сумма</label>
+        <input id="inv-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
+      <div class="field"><label>Комментарий / назначение</label>
+        <input id="inv-comment" class="input" placeholder="За что…"></div>
+      <button class="btn" onclick="createInvoice()">Создать счёт</button>
+      <div id="invoice-result" style="display:none" class="result-box">
+        ID счёта: <code id="invoice-id-out"></code>
+        <div style="color:var(--hint);font-size:12px;margin-top:4px">Передайте этот код плательщику</div>
+        <button class="btn btn-sm btn-sec" style="margin-top:8px" onclick="copyInvoiceId()">📋 Скопировать ID</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Оплатить счёт</h3>
+      <div class="field"><label>ID счёта</label>
+        <input id="pay-inv-id" class="input" placeholder="Вставьте ID счёта…"></div>
+      <button class="btn btn-sec" onclick="lookupInvoice()">🔍 Проверить</button>
+      <div id="inv-lookup" style="display:none;margin:10px 0;font-size:14px"></div>
+      <button class="btn btn-green" id="btn-pay-inv" style="display:none;margin-top:4px" onclick="payInvoice()">Оплатить</button>
+    </div>
+  </div>
+  </div>
+
+  <!-- Вкладка: Своп -->
+  <div id="tab-swap" class="tab-content" style="display:none">
+  <div class="page">
+    <div class="card">
+      <h3>Обмен активов</h3>
+      <div class="swap-wrap">
+        <div class="field"><label>Отдаёте</label>
+          <div style="display:flex;gap:8px">
+            <select id="sw-from" class="input" style="width:110px;flex-shrink:0" onchange="updateRate()">
+              <option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option>
+            </select>
+            <input id="sw-amount" class="input" type="number" min="0.001" step="any"
+              placeholder="0.00" oninput="updateRate()">
+          </div>
+        </div>
+        <div class="swap-arrow" onclick="swapAssets()">⇅</div>
+        <div class="field"><label>Получаете</label>
+          <div style="display:flex;gap:8px">
+            <select id="sw-to" class="input" style="width:110px;flex-shrink:0" onchange="updateRate()">
+              <option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option>
+            </select>
+            <input id="sw-result" class="input" readonly placeholder="—" style="color:var(--hint)">
+          </div>
+        </div>
+        <div id="rate-info" class="rate-info">Введите сумму для расчёта курса</div>
+      </div>
+      <button class="btn" style="margin-top:12px" onclick="doSwap()">Обменять</button>
+    </div>
+    <div class="card">
+      <h3>Тестовые курсы</h3>
+      <div style="font-size:13px;color:var(--hint);line-height:1.9">
+        💎 TON → 💵 USDT: <b>7.50</b><br>
+        ⟠ ETH → 💵 USDT: <b>3 200</b><br>
+        🟡 BNB → 💵 USDT: <b>600</b><br>
+        ₿ BTC → 💵 USDT: <b>95 000</b><br>
+        ⟠ ETH → 💎 TON: <b>426.6</b><br>
+        ₿ BTC → 💎 TON: <b>12 666</b><br>
+        ₿ BTC → ⟠ ETH: <b>29.67</b><br>
+        🟡 BNB → ⟠ ETH: <b>0.1875</b>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Вкладка: P2P -->
+  <div id="tab-p2p" class="tab-content" style="display:none">
+  <div class="page">
+    <div class="card">
+      <h3>Создать ордер</h3>
+      <div class="field"><label>Тип</label>
+        <div style="display:flex;gap:8px">
+          <button id="p2p-buy-btn"  class="btn btn-green btn-sm" onclick="setP2PType('BUY')"  style="flex:1">BUY</button>
+          <button id="p2p-sell-btn" class="btn btn-sec  btn-sm" onclick="setP2PType('SELL')" style="flex:1">SELL</button>
+        </div>
+        <input type="hidden" id="p2p-type" value="BUY">
+      </div>
+      <div class="field"><label>Актив</label>
+        <select id="p2p-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <div class="field"><label>Количество</label>
+        <input id="p2p-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
+      <div class="field"><label>Цена за единицу</label>
+        <input id="p2p-price" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
+      <div class="field"><label>Расчётная валюта</label>
+        <select id="p2p-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+      <button class="btn" onclick="createOrder()">Разместить ордер</button>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Открытые ордера</h3>
+        <button class="btn btn-sm btn-sec" onclick="loadP2P()">↻ Обновить</button>
+      </div>
+      <div id="p2p-list"><div style="color:var(--hint);text-align:center;padding:16px;font-size:14px">Загрузка…</div></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Нижняя навигация -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-tab="wallet" onclick="switchTab('wallet')">
+      <span class="nav-icon">💰</span><span>Кошелёк</span>
+    </div>
+    <div class="nav-item" data-tab="transfer" onclick="switchTab('transfer')">
+      <span class="nav-icon">💸</span><span>Переводы</span>
+    </div>
+    <div class="nav-item" data-tab="invoice" onclick="switchTab('invoice')">
+      <span class="nav-icon">📋</span><span>Счета</span>
+    </div>
+    <div class="nav-item" data-tab="swap" onclick="switchTab('swap')">
+      <span class="nav-icon">🔄</span><span>Своп</span>
+    </div>
+    <div class="nav-item" data-tab="p2p" onclick="switchTab('p2p')">
+      <span class="nav-icon">🤝</span><span>P2P</span>
+    </div>
+  </nav>
+</div>
+
+<!-- QR Modal -->
+<div id="qr-modal" class="modal-overlay" onclick="closeQR()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3>Адрес для пополнения</h3>
+    <img id="qr-img" src="" alt="QR">
+    <div class="modal-addr" id="qr-addr"></div>
+    <button class="btn btn-sm btn-sec" onclick="copyAddr();closeQR()">📋 Скопировать адрес</button>
+    <br>
+    <button class="btn btn-sm modal-close" onclick="closeQR()">Закрыть</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const tg = window.Telegram?.WebApp;
+const initData = tg?.initData || "";
+
+// Когда HTML открыт как file://, запросы к /api/... идут на localhost:8000
+const BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
+
+const state = {
+  wallet: null,
+  newSeed: null,
+  activeTab: "wallet",
+  currentInvoice: null,
+  realMode: false,
+  addresses: {},
+};
+
+// ── API ──────────────────────────────────────────────────────────────────────
+async function api(method, path, body = null) {
+  const opts = {
+    method,
+    headers: { "Content-Type": "application/json", "X-Init-Data": initData },
+  };
+  if (body !== null) opts.body = JSON.stringify(body);
+  let res;
+  try {
+    res = await fetch(BASE_URL + path, opts);
+  } catch (_) {
+    throw new Error("Сервер недоступен — запустите: python app.py");
+  }
+  const data = await res.json().catch(() => ({ detail: "Ошибка ответа сервера" }));
+  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  return data;
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = "") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "show" + (type ? " " + type : "");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = "", 3000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  tg?.expand();
+  tg?.ready();
+
+  if (!initData) {
+    document.getElementById("dev-banner").style.display = "block";
+  }
+
+  try {
+    const data = await api("GET", "/api/wallet");
+    state.wallet = data;
+    if (data.connected) {
+      showApp();
+    } else {
+      showScreen("connect");
+    }
+  } catch (e) {
+    if (e.message.includes("401")) {
+      showScreen("connect");
+    } else {
+      showScreen("connect");
+    }
+    toast(e.message, "err");
+  }
+}
+
+// ── Screens ──────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+}
+
+function showApp() {
+  showScreen("app");
+  const w = state.wallet;
+  updateBalances(w.balances);
+  document.getElementById("hdr-addr").textContent = w.address || "—";
+
+  // Реальный режим
+  state.realMode  = w.real_mode || false;
+  state.addresses = w.addresses || {};
+  const badge = document.getElementById("mode-badge");
+  if (state.realMode) {
+    badge.textContent = "🌐 Реальный блокчейн";
+    badge.style.display = "inline-block";
+    document.getElementById("btn-refresh").style.display = "inline-block";
+  } else {
+    badge.textContent = "🧪 Тест";
+    badge.style.display = "inline-block";
+    document.getElementById("btn-refresh").style.display = "none";
+  }
+
+  // ETH адрес
+  const ethAddr = state.addresses.ETH || "";
+  if (ethAddr) {
+    document.getElementById("hdr-eth-addr").textContent = ethAddr;
+    document.getElementById("eth-addr-row").style.display = "block";
+  }
+  // BTC адрес
+  const btcAddr = state.addresses.BTC || "";
+  if (btcAddr) {
+    document.getElementById("hdr-btc-addr").textContent = btcAddr;
+    document.getElementById("btc-addr-row").style.display = "block";
+  }
+
+  if (!initData) {
+    document.getElementById("dev-banner-app").style.display = "block";
+  }
+  loadHistory();
+  loadP2P();
+}
+
+// ── Connect ──────────────────────────────────────────────────────────────────
+async function connectSeed() {
+  const seed = document.getElementById("seed-input").value.trim();
+  if (!seed) { toast("Введите seed-фразу", "err"); return; }
+  const btn = document.getElementById("btn-connect");
+  btn.disabled = true; btn.textContent = "Подключение и загрузка балансов…";
+  try {
+    const data = await api("POST", "/api/wallet/connect", { seed });
+    state.wallet = {
+      connected: true,
+      address:   data.address,
+      addresses: data.addresses || {},
+      balances:  data.balances,
+      real_mode: data.real_mode || false,
+    };
+    state.newSeed = null;
+    showApp();
+    if (data.real_mode) {
+      toast("✅ Реальные балансы загружены с блокчейна", "ok");
+    } else {
+      toast("Кошелёк подключён (тест-режим)", "ok");
+    }
+  } catch (e) {
+    toast(e.message, "err");
+  } finally {
+    btn.disabled = false; btn.textContent = "Подключить";
+  }
+}
+
+async function requestGenerate() {
+  try {
+    const data = await api("POST", "/api/wallet/connect", { seed: "generate" });
+    state.newSeed = data.seed;
+    state.wallet = {
+      connected: true, address: data.address,
+      addresses: data.addresses || {}, balances: data.balances,
+      real_mode: false,
+    };
+    renderSeedScreen(data.seed);
+    showScreen("newseed");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+function renderSeedScreen(seed) {
+  const words = seed.split(" ");
+  const grid = document.getElementById("seed-words-grid");
+  grid.innerHTML = words.map((w, i) =>
+    `<div class="seed-word"><span>${i+1}</span><b>${w}</b></div>`
+  ).join("");
+  document.getElementById("seed-full").textContent = seed;
+}
+
+function copySeed() {
+  if (state.newSeed) copyToClipboard(state.newSeed);
+}
+
+function confirmNewSeed() {
+  showApp();
+  toast("Кошелёк создан ✓", "ok");
+}
+
+// ── Balances ─────────────────────────────────────────────────────────────────
+function updateBalances(bal) {
+  if (!bal) return;
+  document.getElementById("b-TON").textContent  = fmtAmt(bal.TON,  "TON");
+  document.getElementById("b-USDT").textContent = fmtAmt(bal.USDT, "USDT");
+  document.getElementById("b-ETH").textContent  = fmtAmt(bal.ETH  || 0, "ETH");
+  document.getElementById("b-BNB").textContent  = fmtAmt(bal.BNB  || 0, "BNB");
+  document.getElementById("b-BTC").textContent  = fmtAmt(bal.BTC,  "BTC");
+  if (state.wallet) state.wallet.balances = bal;
+}
+
+function fmtAmt(n, asset) {
+  if (asset === "USDT") return Number(n).toFixed(2);
+  if (asset === "BTC")  return Number(n).toFixed(6);
+  if (asset === "ETH")  return Number(n).toFixed(6);
+  if (asset === "BNB")  return Number(n).toFixed(4);
+  return Number(n).toFixed(4);
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts);  // ISO 8601 with +00:00 offset is valid; don't append Z
+  return d.toLocaleDateString("ru") + " " + d.toLocaleTimeString("ru", {hour:"2-digit",minute:"2-digit"});
+}
+
+// ── Tab switch ───────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  state.activeTab = tab;
+  document.querySelectorAll(".nav-item").forEach(el =>
+    el.classList.toggle("active", el.dataset.tab === tab));
+  document.querySelectorAll(".tab-content").forEach(el =>
+    el.style.display = el.id === "tab-" + tab ? "block" : "none");
+  if (tab === "p2p") loadP2P();
+  if (tab === "wallet") loadHistory();
+}
+
+// ── Wallet: Deposit / Withdraw ────────────────────────────────────────────────
+function openDeposit()  { document.getElementById("deposit-form").style.display = "block"; }
+function closeDeposit() { document.getElementById("deposit-form").style.display = "none"; }
+function openWithdraw() { document.getElementById("withdraw-form").style.display = "block"; }
+function closeWithdraw(){ document.getElementById("withdraw-form").style.display = "none"; }
+
+async function doDeposit() {
+  const asset  = document.getElementById("dep-asset").value;
+  const amount = parseFloat(document.getElementById("dep-amount").value);
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/wallet/deposit", { asset, amount });
+    updateBalances(d.balances); closeDeposit();
+    toast(`+${fmtAmt(amount, asset)} ${asset} зачислено`, "ok");
+    loadHistory();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+async function doWithdraw() {
+  const asset  = document.getElementById("wd-asset").value;
+  const amount = parseFloat(document.getElementById("wd-amount").value);
+  const address = document.getElementById("wd-addr").value.trim();
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  if (!address) { toast("Введите адрес", "err"); return; }
+  try {
+    const d = await api("POST", "/api/wallet/withdraw", { asset, amount, address });
+    updateBalances(d.balances); closeWithdraw();
+    document.getElementById("wd-addr").value = "";
+    document.getElementById("wd-amount").value = "";
+    toast(`${fmtAmt(amount, asset)} ${asset} отправлено`, "ok");
+    loadHistory();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── History ──────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const d = await api("GET", "/api/wallet/history");
+    renderHistory(d.history);
+  } catch (_) {}
+}
+
+const TX_LABEL = {
+  deposit:      "Пополнение",
+  withdraw:     "Вывод",
+  transfer_out: "Перевод",
+  transfer_in:  "Получено",
+  swap:         "Своп",
+  check_in:     "Получен чек",
+  check_out:    "Создан чек",
+};
+const TX_DIR = {
+  deposit:"in", transfer_in:"in", check_in:"in",
+  withdraw:"out", transfer_out:"out", check_out:"out",
+  swap:"swap",
+};
+const TX_ICON = {
+  deposit:"⬇️", withdraw:"⬆️", transfer_out:"➡️",
+  transfer_in:"⬅️", swap:"🔄", check_in:"🎫", check_out:"🎫",
+};
+
+function renderHistory(list) {
+  const el = document.getElementById("tx-list");
+  if (!list || !list.length) {
+    el.innerHTML = `<div style="color:var(--hint);font-size:14px;text-align:center;padding:16px">Нет операций</div>`;
+    return;
+  }
+  el.innerHTML = list.slice(0, 30).map(tx => {
+    const dir = TX_DIR[tx.type] || "out";
+    const sign = dir === "in" ? "+" : dir === "out" ? "−" : "±";
+    const cls  = dir === "in" ? "in" : dir === "out" ? "out" : "swap";
+    const lbl  = TX_LABEL[tx.type] || tx.type;
+    const sub  = tx.comment || (tx.address ? tx.address.slice(0,20)+"…" : fmtDate(tx.ts));
+    return `<div class="tx-item">
+      <div class="tx-icon ${cls}">${TX_ICON[tx.type]||"•"}</div>
+      <div class="tx-info">
+        <div class="tx-label">${lbl}</div>
+        <div class="tx-sub">${sub}</div>
+      </div>
+      <div class="tx-amt ${cls}">${sign}${fmtAmt(tx.amount, tx.asset)} ${tx.asset}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── QR modal ─────────────────────────────────────────────────────────────────
+function showQR() {
+  const addr = state.wallet?.address;
+  if (!addr) return;
+  document.getElementById("qr-img").src  = `${BASE_URL}/api/qr/${encodeURIComponent(addr)}`;
+  document.getElementById("qr-addr").textContent = addr;
+  document.getElementById("qr-modal").classList.add("open");
+}
+function closeQR() { document.getElementById("qr-modal").classList.remove("open"); }
+
+function copyAddr() {
+  const addr = state.wallet?.address;
+  if (addr) copyToClipboard(addr);
+}
+
+// ── Transfer ─────────────────────────────────────────────────────────────────
+async function doTransfer() {
+  const asset   = document.getElementById("tr-asset").value;
+  const address = document.getElementById("tr-addr").value.trim();
+  const amount  = parseFloat(document.getElementById("tr-amount").value);
+  const comment = document.getElementById("tr-comment").value.trim();
+  if (!address) { toast("Введите адрес получателя", "err"); return; }
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/transfer", { asset, address, amount, comment });
+    updateBalances(d.balances);
+    document.getElementById("tr-addr").value = "";
+    document.getElementById("tr-amount").value = "";
+    document.getElementById("tr-comment").value = "";
+    toast(`Переведено ${fmtAmt(amount, asset)} ${asset}`, "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── Checks ───────────────────────────────────────────────────────────────────
+async function createCheck() {
+  const asset   = document.getElementById("ch-asset").value;
+  const amount  = parseFloat(document.getElementById("ch-amount").value);
+  const comment = document.getElementById("ch-comment").value.trim();
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/check/create", { asset, amount, comment });
+    updateBalances(d.check ? state.wallet.balances : state.wallet.balances);
+    document.getElementById("check-code").textContent = d.code;
+    document.getElementById("check-result").style.display = "block";
+    document.getElementById("ch-amount").value = "";
+    // Refresh balances
+    const wd = await api("GET", "/api/wallet");
+    updateBalances(wd.balances);
+    toast("Чек создан", "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+
+function copyCheckCode() {
+  const code = document.getElementById("check-code").textContent;
+  if (code) copyToClipboard(code);
+}
+
+async function activateCheck() {
+  const code = document.getElementById("act-code").value.trim();
+  if (!code) { toast("Введите код чека", "err"); return; }
+  try {
+    const d = await api("POST", `/api/check/${encodeURIComponent(code)}/activate`);
+    updateBalances(d.balances);
+    document.getElementById("check-info").style.display = "block";
+    document.getElementById("check-info").textContent =
+      `✅ Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
+    document.getElementById("act-code").value = "";
+    toast("Чек активирован ✓", "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── Invoice ──────────────────────────────────────────────────────────────────
+let _lastInvId = "";
+
+async function createInvoice() {
+  const currency = document.getElementById("inv-currency").value;
+  const amount   = parseFloat(document.getElementById("inv-amount").value);
+  const comment  = document.getElementById("inv-comment").value.trim();
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/invoice/create", { currency, amount, comment });
+    _lastInvId = d.invoice_id;
+    document.getElementById("invoice-id-out").textContent = d.invoice_id;
+    document.getElementById("invoice-result").style.display = "block";
+    document.getElementById("inv-amount").value = "";
+    toast("Счёт создан", "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+
+function copyInvoiceId() {
+  if (_lastInvId) copyToClipboard(_lastInvId);
+}
+
+async function lookupInvoice() {
+  const id = document.getElementById("pay-inv-id").value.trim();
+  if (!id) { toast("Введите ID счёта", "err"); return; }
+  const info = document.getElementById("inv-lookup");
+  const btn  = document.getElementById("btn-pay-inv");
+  try {
+    const d = await api("GET", `/api/invoice/${encodeURIComponent(id)}`);
+    const inv = d.invoice;
+    const statusBadge = inv.status === "pending"
+      ? `<span class="badge badge-pending">ожидает</span>`
+      : `<span class="badge badge-paid">оплачен</span>`;
+    info.innerHTML = `<b>${fmtAmt(inv.amount, inv.currency)} ${inv.currency}</b> ${statusBadge}<br>
+      <span style="color:var(--hint)">${inv.comment || "—"}</span>`;
+    info.style.display = "block";
+    btn.style.display = inv.status === "pending" ? "block" : "none";
+    state.currentInvoice = id;
+  } catch (e) { toast(e.message, "err"); }
+}
+
+async function payInvoice() {
+  if (!state.currentInvoice) return;
+  try {
+    const d = await api("POST", `/api/invoice/${encodeURIComponent(state.currentInvoice)}/pay`);
+    updateBalances(d.balances);
+    document.getElementById("btn-pay-inv").style.display = "none";
+    document.getElementById("inv-lookup").innerHTML +=
+      `<br><span style="color:var(--green)">✅ Оплачено</span>`;
+    document.getElementById("pay-inv-id").value = "";
+    toast("Счёт оплачен ✓", "ok");
+    state.currentInvoice = null;
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── Swap ──────────────────────────────────────────────────────────────────────
+async function updateRate() {
+  const from   = document.getElementById("sw-from").value;
+  const to     = document.getElementById("sw-to").value;
+  const amount = parseFloat(document.getElementById("sw-amount").value);
+  const info   = document.getElementById("rate-info");
+  const resEl  = document.getElementById("sw-result");
+  if (from === to) { info.textContent = "Выберите разные активы"; resEl.value = ""; return; }
+  if (!amount || amount <= 0) { info.textContent = "Введите сумму"; resEl.value = ""; return; }
+  try {
+    const d = await api("GET", `/api/swap/rate?from_asset=${from}&to_asset=${to}&amount=${amount}`);
+    resEl.value = d.result;
+    info.textContent = `1 ${from} ≈ ${d.rate} ${to}`;
+  } catch (_) { info.textContent = "Пара не поддерживается"; resEl.value = ""; }
+}
+
+function swapAssets() {
+  const f = document.getElementById("sw-from");
+  const t = document.getElementById("sw-to");
+  [f.value, t.value] = [t.value, f.value];
+  updateRate();
+}
+
+async function doSwap() {
+  const from_asset = document.getElementById("sw-from").value;
+  const to_asset   = document.getElementById("sw-to").value;
+  const amount     = parseFloat(document.getElementById("sw-amount").value);
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  if (from_asset === to_asset) { toast("Выберите разные активы", "err"); return; }
+  try {
+    const d = await api("POST", "/api/swap", { from_asset, to_asset, amount });
+    updateBalances(d.balances);
+    document.getElementById("sw-amount").value = "";
+    document.getElementById("sw-result").value = "";
+    document.getElementById("rate-info").textContent = "Введите сумму для расчёта курса";
+    toast(`Получено ${fmtAmt(d.received, to_asset)} ${to_asset} ✓`, "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── P2P ──────────────────────────────────────────────────────────────────────
+let _p2pType = "BUY";
+
+function setP2PType(type) {
+  _p2pType = type;
+  document.getElementById("p2p-type").value = type;
+  document.getElementById("p2p-buy-btn").className  = type === "BUY"  ? "btn btn-green btn-sm" : "btn btn-sec btn-sm";
+  document.getElementById("p2p-sell-btn").className = type === "SELL" ? "btn btn-danger btn-sm" : "btn btn-sec btn-sm";
+}
+
+async function loadP2P() {
+  try {
+    const d = await api("GET", "/api/p2p/orders");
+    renderP2P(d.orders);
+  } catch (e) {
+    document.getElementById("p2p-list").innerHTML =
+      `<div style="color:var(--danger);text-align:center;padding:16px;font-size:14px">${e.message}</div>`;
+  }
+}
+
+function renderP2P(orders) {
+  const el = document.getElementById("p2p-list");
+  if (!orders || !orders.length) {
+    el.innerHTML = `<div style="color:var(--hint);text-align:center;padding:16px;font-size:14px">Нет открытых ордеров</div>`;
+    return;
+  }
+  el.innerHTML = orders.map(o => {
+    const total = (o.amount * o.price).toFixed(2);
+    const isBuy = o.type === "BUY";
+    return `<div class="order-card">
+      <div class="order-top">
+        <span class="badge ${isBuy ? "badge-buy" : "badge-sell"}">${o.type}</span>
+        <span style="font-size:12px;color:var(--hint)">${o.creator_name}</span>
+      </div>
+      <div class="order-info">${fmtAmt(o.amount, o.asset)} ${o.asset} по цене ${o.price} ${o.currency}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="order-price">${total} ${o.currency}</div>
+        <button class="btn btn-sm ${isBuy ? "btn-sec" : "btn-green"}"
+          onclick="takeOrder('${o.id}')">
+          ${isBuy ? "Продать" : "Купить"}
+        </button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function createOrder() {
+  const type     = document.getElementById("p2p-type").value;
+  const asset    = document.getElementById("p2p-asset").value;
+  const amount   = parseFloat(document.getElementById("p2p-amount").value);
+  const price    = parseFloat(document.getElementById("p2p-price").value);
+  const currency = document.getElementById("p2p-currency").value;
+  if (!amount || amount <= 0 || !price || price <= 0) {
+    toast("Введите сумму и цену", "err"); return;
+  }
+  try {
+    await api("POST", "/api/p2p/order", { type, asset, amount, price, currency });
+    document.getElementById("p2p-amount").value = "";
+    document.getElementById("p2p-price").value  = "";
+    // Refresh balances after SELL
+    const wd = await api("GET", "/api/wallet");
+    updateBalances(wd.balances);
+    toast("Ордер размещён ✓", "ok");
+    loadP2P();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+async function takeOrder(id) {
+  try {
+    const d = await api("POST", `/api/p2p/order/${id}/take`);
+    updateBalances(d.balances);
+    toast("Ордер закрыт ✓", "ok");
+    loadP2P();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── Refresh с блокчейна ──────────────────────────────────────────────────────
+async function refreshBalances() {
+  const btn = document.getElementById("btn-refresh");
+  btn.textContent = "⏳ …";
+  btn.disabled = true;
+  try {
+    const d = await api("POST", "/api/wallet/refresh");
+    updateBalances(d.balances);
+    if (d.refreshed) toast("Балансы обновлены с блокчейна ✓", "ok");
+    else toast(d.message || "Нет данных", "");
+  } catch (e) {
+    toast(e.message, "err");
+  } finally {
+    btn.textContent = "🔄 Обновить"; btn.disabled = false;
+  }
+}
+
+// ── BTC address copy ─────────────────────────────────────────────────────────
+function copyEthAddr() {
+  const addr = state.addresses.ETH || "";
+  if (addr) copyToClipboard(addr);
+}
+function copyBtcAddr() {
+  const addr = state.addresses.BTC || "";
+  if (addr) copyToClipboard(addr);
+}
+
+// ── Address override ─────────────────────────────────────────────────────────
+function toggleAddrOverride() {
+  const el = document.getElementById("addr-override");
+  el.style.display = el.style.display === "none" ? "block" : "none";
+  if (el.style.display === "block") {
+    document.getElementById("ov-ton").value = state.addresses.TON || "";
+    document.getElementById("ov-eth").value = state.addresses.ETH || "";
+    document.getElementById("ov-btc").value = state.addresses.BTC || "";
+  }
+}
+
+async function applyAddrOverride() {
+  const tonAddr = document.getElementById("ov-ton").value.trim();
+  const btcAddr = document.getElementById("ov-btc").value.trim();
+  try {
+    const ethAddr = document.getElementById("ov-eth").value.trim();
+    if (tonAddr) {
+      const d = await api("POST", "/api/wallet/set_address", { asset: "TON", address: tonAddr });
+      state.addresses.TON = tonAddr;
+      state.wallet.address = tonAddr;
+      document.getElementById("hdr-addr").textContent = tonAddr;
+      updateBalances(d.balances);
+    }
+    if (ethAddr) {
+      const d = await api("POST", "/api/wallet/set_address", { asset: "ETH", address: ethAddr });
+      state.addresses.ETH = ethAddr;
+      document.getElementById("hdr-eth-addr").textContent = ethAddr;
+      document.getElementById("eth-addr-row").style.display = "block";
+      updateBalances(d.balances);
+    }
+    if (btcAddr) {
+      const d = await api("POST", "/api/wallet/set_address", { asset: "BTC", address: btcAddr });
+      state.addresses.BTC = btcAddr;
+      document.getElementById("hdr-btc-addr").textContent = btcAddr;
+      document.getElementById("btc-addr-row").style.display = "block";
+      updateBalances(d.balances);
+    }
+    toggleAddrOverride();
+    toast("Адреса обновлены, балансы загружены ✓", "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+// ── Clipboard ────────────────────────────────────────────────────────────────
+function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast("Скопировано ✓", "ok")).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  document.execCommand("copy");
+  document.body.removeChild(ta);
+  toast("Скопировано ✓", "ok");
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

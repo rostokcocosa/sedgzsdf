@@ -1,0 +1,9 @@
+aiogram==3.31.0
+aiohttp==3.12.13
+bip_utils==2.13.0
+fastapi==0.165.0
+mnemonic==0.21
+python-dotenv==1.1.1
+qrcode==8.2
+Pillow==11.3.0
+uvicorn==0.54.0

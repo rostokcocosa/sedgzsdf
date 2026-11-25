@@ -1,0 +1,1120 @@
+﻿"""
+Telegram Bot + Mini App вЂ” Р»РѕРєР°Р»СЊРЅС‹Р№ С‚РµСЃС‚РѕРІС‹Р№ СЃС‚РµРЅРґ
+Р—Р°РїСѓСЃРє: python app.py
+"""
+import asyncio
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import urllib.parse
+from datetime import datetime, timezone
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+from io import BytesIO
+from typing import Optional
+
+import qrcode
+import uvicorn
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
+from mnemonic import Mnemonic
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# в”Ђв”Ђ РћРїС†РёРѕРЅР°Р»СЊРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґР»СЏ СЂРµР°Р»СЊРЅРѕРіРѕ Р±Р»РѕРєС‡РµР№РЅР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+try:
+    import aiohttp
+    from bip_utils import (
+        Bip39SeedGenerator, Bip44, Bip44Coins,
+        Bip84, Bip84Coins, Bip44Changes,
+    )
+    BLOCKCHAIN_AVAILABLE = True
+except ImportError:
+    BLOCKCHAIN_AVAILABLE = False
+    print("[WARN] bip_utils/aiohttp РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅС‹ вЂ” СЂРµР°Р»СЊРЅС‹Р№ Р±Р»РѕРєС‡РµР№РЅ РЅРµРґРѕСЃС‚СѓРїРµРЅ. "
+          "Р—Р°РїСѓСЃС‚РёС‚Рµ: pip install bip_utils aiohttp")
+
+BOT_TOKEN: str = os.environ.get("BOT_TOKEN", "")
+WEBAPP_URL: str = os.environ.get("WEBAPP_URL", "http://localhost:8000")
+DEV_MODE: bool = os.environ.get("DEV_MODE", "false").strip().lower() == "true"
+PORT: int = int(os.environ.get("PORT", "8000"))
+ADMIN_ID: int | None = int(os.environ["ADMIN_ID"]) if os.environ.get("ADMIN_ID", "").strip().isdigit() else None
+
+# в”Ђв”Ђ In-memory С…СЂР°РЅРёР»РёС‰Рµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+users: dict[int, dict] = {}
+transactions: dict[int, list] = {}
+checks: dict[str, dict] = {}
+invoices: dict[str, dict] = {}
+p2p_orders: list[dict] = []
+
+ASSETS = ["TON", "USDT", "ETH", "BNB", "BTC"]
+TEST_RATES: dict[tuple, float] = {
+    ("TON",  "USDT"): 7.50,       ("USDT", "TON"):  1 / 7.50,
+    ("BTC",  "USDT"): 95000.0,    ("USDT", "BTC"):  1 / 95000.0,
+    ("BTC",  "TON"):  12666.0,    ("TON",  "BTC"):  1 / 12666.0,
+    ("ETH",  "USDT"): 3200.0,     ("USDT", "ETH"):  1 / 3200.0,
+    ("ETH",  "TON"):  426.6,      ("TON",  "ETH"):  1 / 426.6,
+    ("ETH",  "BTC"):  0.03368,    ("BTC",  "ETH"):  1 / 0.03368,
+    ("BNB",  "USDT"): 600.0,       ("USDT", "BNB"):  1 / 600.0,
+    ("BNB",  "TON"):  80.0,        ("TON",  "BNB"):  1 / 80.0,
+    ("BNB",  "ETH"):  0.1875,      ("ETH",  "BNB"):  1 / 0.1875,
+    ("BNB",  "BTC"):  0.006316,    ("BTC",  "BNB"):  1 / 0.006316,
+}
+
+# USDT Jetton РЅР° TON mainnet
+USDT_JETTON_MASTER = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"
+USDT_ERC20_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+ETH_RPC_URLS = [
+    "https://virginia.rpc.blxrbdn.com",
+    "https://uk.rpc.blxrbdn.com",
+    "https://eth.llamarpc.com",
+    "https://rpc.ankr.com/eth",
+]
+USDT_BEP20_CONTRACT = "0x55d398326f99059fF775485246999027B3197955"
+BSC_RPC_URLS = [
+    "https://bsc-dataseed.binance.org",
+    "https://bsc-dataseed1.binance.org",
+    "https://bsc-dataseed2.binance.org",
+]
+
+mnemo = Mnemonic("english")
+
+
+# в”Ђв”Ђ Р”РµСЂРёРІР°С†РёСЏ Р°РґСЂРµСЃРѕРІ РёР· BIP-39 seed в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+def _fake_address(seed: str) -> str:
+    h = hashlib.sha256(seed.encode()).hexdigest()
+    return "EQ" + h[:46].upper()
+
+
+def derive_all_addresses(mnemonic_phrase: str) -> dict:
+    """Р”РµСЂРёРІР°С†РёСЏ СЂРµР°Р»СЊРЅС‹С… Р°РґСЂРµСЃРѕРІ TON Рё BTC РёР· BIP-39 mnemonic."""
+    if not BLOCKCHAIN_AVAILABLE:
+        return {}
+    result = {}
+    try:
+        seed_bytes = Bip39SeedGenerator(mnemonic_phrase).Generate()
+
+        # TON вЂ” BIP-44, coin type 607, m/44'/607'/0'/0/0
+        try:
+            ton_ctx = (
+                Bip44.FromSeed(seed_bytes, Bip44Coins.TON)
+                .Purpose().Coin().Account(0)
+                .Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
+            )
+            result["TON"] = ton_ctx.PublicKey().ToAddress()
+        except Exception as e:
+            print(f"[DERIVE][TON] {e}")
+
+        # BTC вЂ” BIP-84 native SegWit (bech32), m/84'/0'/0'/0/0
+        try:
+            btc_ctx = (
+                Bip84.FromSeed(seed_bytes, Bip84Coins.BITCOIN)
+                .Purpose().Coin().Account(0)
+                .Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
+            )
+            result["BTC"] = btc_ctx.PublicKey().ToAddress()
+        except Exception as e:
+            print(f"[DERIVE][BTC] {e}")
+
+
+        # ETH — BIP-44, coin type 60, m/44'/60'/0'/0/0
+        try:
+            eth_ctx = (
+                Bip44.FromSeed(seed_bytes, Bip44Coins.ETHEREUM)
+                .Purpose().Coin().Account(0)
+                .Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
+            )
+            result["ETH"] = eth_ctx.PublicKey().ToAddress()
+        except Exception as e:
+            print(f"[DERIVE][ETH] {e}")
+
+        # BNB (BSC) — same EVM address as ETH
+        result["BNB"] = result.get("ETH", "")
+
+    except Exception as e:
+        print(f"[DERIVE] РћР±С‰Р°СЏ РѕС€РёР±РєР°: {e}")
+    return result
+
+
+# в”Ђв”Ђ Р—Р°РїСЂРѕСЃ Р±Р°Р»Р°РЅСЃРѕРІ РёР· Р±Р»РѕРєС‡РµР№РЅР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+
+async def _eth_rpc(payload: dict) -> dict:
+    """Try multiple Ethereum JSON-RPC endpoints, return first successful."""
+    if not BLOCKCHAIN_AVAILABLE:
+        return {}
+    for url in ETH_RPC_URLS:
+        try:
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(url, json=payload,
+                                     timeout=aiohttp.ClientTimeout(total=8)) as r:
+                    if r.status == 200:
+                        data = await r.json()
+                        if data.get("result") is not None:
+                            return data
+        except Exception as e:
+            print(f"[ETH_RPC] {url}: {e}")
+            continue
+    return {}
+
+
+async def _bsc_rpc(payload: dict) -> dict:
+    """Try multiple BSC JSON-RPC endpoints, return first successful."""
+    if not BLOCKCHAIN_AVAILABLE:
+        return {}
+    for url in BSC_RPC_URLS:
+        try:
+            async with aiohttp.ClientSession() as sess:
+                async with sess.post(url, json=payload,
+                                     timeout=aiohttp.ClientTimeout(total=8)) as r:
+                    if r.status == 200:
+                        data = await r.json()
+                        if data.get("result") is not None:
+                            return data
+        except Exception as e:
+            print(f"[BSC_RPC] {url}: {e}")
+            continue
+    return {}
+
+async def fetch_ton_balance(address: str) -> float:
+    if not address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"https://toncenter.com/api/v2/getAddressBalance?address={address}"
+            async with sess.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                data = await r.json()
+                if data.get("ok"):
+                    return int(data["result"]) / 1e9
+    except Exception as e:
+        print(f"[TON] {e}")
+    return 0.0
+
+
+async def fetch_usdt_ton_balance(ton_address: str) -> float:
+    """USDT-Jetton Р±Р°Р»Р°РЅСЃ РЅР° TON С‡РµСЂРµР· tonapi.io."""
+    if not ton_address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"https://tonapi.io/v2/accounts/{ton_address}/jettons/{USDT_JETTON_MASTER}"
+            headers = {"Accept": "application/json"}
+            async with sess.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    balance_str = data.get("balance", "0")
+                    return int(balance_str) / 1e6  # USDT: 6 decimal
+    except Exception as e:
+        print(f"[USDT-TON] {e}")
+    return 0.0
+
+
+async def fetch_btc_balance(address: str) -> float:
+    if not address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"https://mempool.space/api/address/{address}"
+            async with sess.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    funded = data["chain_stats"]["funded_txo_sum"]
+                    spent  = data["chain_stats"]["spent_txo_sum"]
+                    return (funded - spent) / 1e8
+    except Exception as e:
+        print(f"[BTC] {e}")
+    return 0.0
+
+
+
+async def fetch_eth_balance(address: str) -> float:
+    if not address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        payload = {"jsonrpc": "2.0", "method": "eth_getBalance",
+                   "params": [address, "latest"], "id": 1}
+        data = await _eth_rpc(payload)
+        result = data.get("result", "0x0") or "0x0"
+        val = int(result, 16) / 1e18
+        print(f"[ETH] balance {address[:12]}... = {val}")
+        return val
+    except Exception as e:
+        print(f"[ETH] {e}")
+    return 0.0
+
+
+async def fetch_usdt_eth_balance(eth_address: str) -> float:
+    if not eth_address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        padded = eth_address.lower().replace("0x", "").zfill(64)
+        data_hex = "0x70a08231" + padded
+        payload = {"jsonrpc": "2.0", "method": "eth_call",
+                   "params": [{"to": USDT_ERC20_CONTRACT, "data": data_hex}, "latest"], "id": 1}
+        data = await _eth_rpc(payload)
+        result = data.get("result", "0x0") or "0x0"
+        val = int(result, 16) / 1e6
+        print(f"[USDT-ETH] balance {eth_address[:12]}... = {val}")
+        return val
+    except Exception as e:
+        print(f"[USDT-ETH] {e}")
+    return 0.0
+
+
+async def fetch_bnb_balance(address: str) -> float:
+    if not address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        payload = {"jsonrpc": "2.0", "method": "eth_getBalance",
+                   "params": [address, "latest"], "id": 1}
+        data = await _bsc_rpc(payload)
+        result = data.get("result", "0x0") or "0x0"
+        val = int(result, 16) / 1e18
+        print(f"[BNB] balance {address[:12]}... = {val}")
+        return val
+    except Exception as e:
+        print(f"[BNB] {e}")
+    return 0.0
+
+
+async def fetch_usdt_bsc_balance(address: str) -> float:
+    if not address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0
+    try:
+        padded = address.lower().replace("0x", "").zfill(64)
+        data_hex = "0x70a08231" + padded
+        payload = {"jsonrpc": "2.0", "method": "eth_call",
+                   "params": [{"to": USDT_BEP20_CONTRACT, "data": data_hex}, "latest"], "id": 1}
+        data = await _bsc_rpc(payload)
+        result = data.get("result", "0x0") or "0x0"
+        val = int(result, 16) / 1e18  # USDT-BEP20: 18 decimals
+        print(f"[USDT-BSC] balance {address[:12]}... = {val}")
+        return val
+    except Exception as e:
+        print(f"[USDT-BSC] {e}")
+    return 0.0
+
+async def fetch_real_balances(addresses: dict) -> dict:
+    ton_addr = addresses.get("TON", "")
+    btc_addr = addresses.get("BTC", "")
+    eth_addr = addresses.get("ETH", "")
+    bnb_addr = addresses.get("BNB", eth_addr)  # BSC = same EVM address as ETH
+    results = await asyncio.gather(
+        fetch_ton_balance(ton_addr),
+        fetch_usdt_ton_balance(ton_addr),
+        fetch_btc_balance(btc_addr),
+        fetch_eth_balance(eth_addr),
+        fetch_usdt_eth_balance(eth_addr),
+        fetch_bnb_balance(bnb_addr),
+        fetch_usdt_bsc_balance(bnb_addr),
+        return_exceptions=True,
+    )
+    def _s(v): return v if not isinstance(v, Exception) else 0.0
+    ton_bal, usdt_ton, btc_bal, eth_bal, usdt_eth, bnb_bal, usdt_bsc = results
+    return {
+        "TON":  _s(ton_bal),
+        "USDT": round(_s(usdt_ton) + _s(usdt_eth) + _s(usdt_bsc), 6),
+        "ETH":  _s(eth_bal),
+        "BNB":  _s(bnb_bal),
+        "BTC":  _s(btc_bal),
+    }
+
+
+# в”Ђв”Ђ Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+def get_or_create_user(user_id: int, username: str = "", first_name: str = "User") -> dict:
+    if user_id not in users:
+        users[user_id] = {
+            "id": user_id,
+            "username": username,
+            "first_name": first_name,
+            "seed": None,
+            "address": None,
+            "addresses": {},       # {asset: on-chain address}
+            "real_mode": False,    # True вЂ” СЂРµР°Р»СЊРЅС‹Р№ Р±Р»РѕРєС‡РµР№РЅ
+            "balances": {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0},
+        }
+        transactions[user_id] = []
+    return users[user_id]
+
+
+def add_tx(user_id: int, tx_type: str, asset: str, amount: float,
+           address: str = "", comment: str = "", status: str = "completed") -> dict:
+    tx = {
+        "id": secrets.token_hex(8),
+        "type": tx_type,
+        "asset": asset,
+        "amount": amount,
+        "address": address,
+        "comment": comment,
+        "status": status,
+        "ts": _now(),
+    }
+    transactions.setdefault(user_id, []).insert(0, tx)
+    return tx
+
+
+def verify_init_data(init_data: str) -> Optional[dict]:
+    if not BOT_TOKEN or not init_data:
+        return None
+    try:
+        parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        hash_val = parsed.pop("hash", "")
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, hash_val):
+            return None
+        return json.loads(parsed.get("user", "{}"))
+    except Exception:
+        return None
+
+
+def auth_user(init_data: str) -> dict:
+    if DEV_MODE:
+        return get_or_create_user(99999, "devuser", "Dev User")
+    if not init_data:
+        raise HTTPException(401, detail="initData РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РћС‚РєСЂРѕР№С‚Рµ РїСЂРёР»РѕР¶РµРЅРёРµ РёР· Telegram.")
+    user_data = verify_init_data(init_data)
+    if not user_data:
+        raise HTTPException(
+            401,
+            detail=(
+                "РџСЂРѕРІРµСЂРєР° HMAC-SHA256 initData РЅРµ РїСЂРѕС€Р»Р°. "
+                "Р’РѕР·РјРѕР¶РЅС‹Рµ РїСЂРёС‡РёРЅС‹: РЅРµРІРµСЂРЅС‹Р№ BOT_TOKEN, "
+                "РїСЂРёР»РѕР¶РµРЅРёРµ РѕС‚РєСЂС‹С‚Рѕ РЅРµ РёР· Telegram, РёР»Рё РїРѕРґРїРёСЃСЊ СѓСЃС‚Р°СЂРµР»Р°."
+            ),
+        )
+    user_id = int(user_data["id"])
+    return get_or_create_user(user_id, user_data.get("username", ""), user_data.get("first_name", "User"))
+
+
+# в”Ђв”Ђ FastAPI РїСЂРёР»РѕР¶РµРЅРёРµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+def _user_label(user: dict) -> str:
+    uid = user.get("id", "?")
+    name = user.get("first_name", "") or user.get("username", "")
+    uname = user.get("username", "")
+    parts = [f"<b>{name}</b>" if name else ""]
+    if uname:
+        parts.append(f"@{uname}")
+    parts.append(f"<code>{uid}</code>")
+    return " ".join(p for p in parts if p)
+
+
+async def notify_admin(text: str) -> None:
+    if not ADMIN_ID or not _bot:
+        return
+    try:
+        await _bot.send_message(ADMIN_ID, text, parse_mode="HTML")
+    except Exception as e:
+        print(f"[ADMIN NOTIFY] {e}")
+
+app = FastAPI(title="DeFi Mini App")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# в”Ђв”Ђ API: Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёСЏ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.post("/api/auth")
+async def api_auth(request: Request):
+    body = await request.json()
+    user = auth_user(body.get("initData", ""))
+    return {"ok": True, "user": {"id": user["id"], "first_name": user["first_name"]}}
+
+
+# в”Ђв”Ђ API: РєРѕС€РµР»С‘Рє в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.get("/api/wallet")
+async def api_wallet(x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    return {
+        "connected":  user["seed"] is not None,
+        "address":    user["address"],
+        "addresses":  user.get("addresses", {}),
+        "balances":   user["balances"],
+        "real_mode":  user.get("real_mode", False),
+        "blockchain_available": BLOCKCHAIN_AVAILABLE,
+    }
+
+
+@app.post("/api/wallet/connect")
+async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    seed = body.get("seed", "").strip()
+
+    if seed == "generate":
+        # РўРµСЃС‚РѕРІС‹Р№ СЂРµР¶РёРј: РіРµРЅРµСЂР°С†РёСЏ Рё С„РёРєС‚РёРІРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹
+        seed = mnemo.generate(strength=128)
+        user["seed"] = seed
+        user["real_mode"] = False
+        user["address"] = _fake_address(seed)
+        user["addresses"] = {"TON": user["address"], "ETH": "", "BNB": "", "BTC": ""}
+        if all(v == 0.0 for v in user["balances"].values()):
+            user["balances"] = {"TON": 10.0, "USDT": 75.0, "ETH": 0.5, "BNB": 2.0, "BTC": 0.001}
+            add_tx(user["id"], "deposit", "TON",  10.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
+            add_tx(user["id"], "deposit", "USDT", 75.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
+            add_tx(user["id"], "deposit", "BTC",  0.001, comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
+    else:
+        # Р РµР°Р»СЊРЅС‹Р№ seed вЂ” РІР°Р»РёРґР°С†РёСЏ BIP-39
+        try:
+            valid = mnemo.check(seed)
+        except Exception:
+            valid = False
+        if not valid:
+            raise HTTPException(400, "РќРµРІРµСЂРЅР°СЏ BIP-39 seed-С„СЂР°Р·Р°")
+
+        user["seed"] = seed
+        user["real_mode"] = BLOCKCHAIN_AVAILABLE
+
+        # Р”РµСЂРёРІР°С†РёСЏ Р°РґСЂРµСЃРѕРІ
+        addrs = derive_all_addresses(seed)
+        if not addrs:
+            # bip_utils РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” С„РёРєС‚РёРІРЅС‹Р№ Р°РґСЂРµСЃ
+            addrs = {"TON": _fake_address(seed), "BTC": ""}
+
+        user["addresses"] = addrs
+        user["address"] = addrs.get("TON") or _fake_address(seed)
+
+        if BLOCKCHAIN_AVAILABLE:
+            print(f"[CONNECT] Р—Р°РїСЂРѕСЃ Р±Р°Р»Р°РЅСЃРѕРІ РґР»СЏ TON={addrs.get('TON','?')} BTC={addrs.get('BTC','?')}")
+            user["balances"] = await fetch_real_balances(addrs)
+            print(f"[CONNECT] Р‘Р°Р»Р°РЅСЃС‹: {user['balances']}")
+        else:
+            # bip_utils РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” СЂРµР°Р»СЊРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹ РЅРµРґРѕСЃС‚СѓРїРЅС‹
+            user["balances"] = {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0}
+
+    _bal = user["balances"]
+    _addrs = user.get("addresses", {})
+    _mode = "🌐 Реальный блокчейн" if user.get("real_mode") else "🧪 Тестовый режим"
+    _ton_a = _addrs.get("TON", "—")
+    _eth_a = _addrs.get("ETH", "—")
+    _btc_a = _addrs.get("BTC", "—")
+    await notify_admin(
+        f"🔑 <b>ПОДКЛЮЧЕНИЕ КОШЕЛЬКА</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Пользователь: {_user_label(user)}\n"
+        f"⚙️ Режим: {_mode}\n"
+        f"🌱 Seed (первые 4 слова): <code>{' '.join(seed.split()[:4])}…</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📍 <b>Адреса:</b>\n"
+        f"  TON: <code>{_ton_a}</code>\n"
+        f"  ETH/BNB: <code>{_eth_a}</code>\n"
+        f"  BTC: <code>{_btc_a}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 <b>Балансы:</b>\n"
+        f"  💎 TON:  {_bal.get('TON', 0):.4f}\n"
+        f"  💵 USDT: {_bal.get('USDT', 0):.2f}\n"
+        f"  ⟠ ETH:  {_bal.get('ETH', 0):.6f}\n"
+        f"  🟡 BNB:  {_bal.get('BNB', 0):.4f}\n"
+        f"  ₿ BTC:  {_bal.get('BTC', 0):.8f}"
+    )
+    return {
+        "ok": True,
+        "seed": seed,
+        "address":   user["address"],
+        "addresses": user.get("addresses", {}),
+        "balances":  user["balances"],
+        "real_mode": user.get("real_mode", False),
+    }
+
+
+@app.post("/api/wallet/refresh")
+async def api_wallet_refresh(x_init_data: str = Header(None)):
+    """РћР±РЅРѕРІРёС‚СЊ Р±Р°Р»Р°РЅСЃС‹ СЃ Р±Р»РѕРєС‡РµР№РЅР° (С‚РѕР»СЊРєРѕ РґР»СЏ СЂРµР°Р»СЊРЅРѕРіРѕ СЂРµР¶РёРјР°)."""
+    user = auth_user(x_init_data or "")
+    if not user.get("real_mode") or not BLOCKCHAIN_AVAILABLE:
+        return {"ok": True, "balances": user["balances"], "refreshed": False,
+                "message": "РўРѕР»СЊРєРѕ РґР»СЏ СЂРµР°Р»СЊРЅРѕРіРѕ СЂРµР¶РёРјР° (РЅСѓР¶РЅР° СѓСЃС‚Р°РЅРѕРІРєР° bip_utils)"}
+    addrs = user.get("addresses", {})
+    user["balances"] = await fetch_real_balances(addrs)
+    return {"ok": True, "balances": user["balances"], "refreshed": True}
+
+
+@app.post("/api/wallet/set_address")
+async def api_wallet_set_address(request: Request, x_init_data: str = Header(None)):
+    """Р СѓС‡РЅР°СЏ СѓСЃС‚Р°РЅРѕРІРєР° Р°РґСЂРµСЃР° (РµСЃР»Рё РґРµСЂРёРІР°С†РёСЏ РЅРµ СЃРѕРІРїР°Р»Р° СЃ РєРѕС€РµР»СЊРєРѕРј)."""
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    asset = body.get("asset", "TON")
+    address = body.get("address", "").strip()
+    if asset not in ASSETS:
+        raise HTTPException(400, "РќРµРІРµСЂРЅС‹Р№ Р°РєС‚РёРІ")
+    if not address:
+        raise HTTPException(400, "РђРґСЂРµСЃ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹Рј")
+    user.setdefault("addresses", {})[asset] = address
+    if asset == "TON":
+        user["address"] = address
+    # РћР±РЅРѕРІРёС‚СЊ Р±Р°Р»Р°РЅСЃ РґР»СЏ СЌС‚РѕРіРѕ Р°РґСЂРµСЃР°
+    if BLOCKCHAIN_AVAILABLE and user.get("real_mode"):
+        if asset == "TON":
+            ton_bal, usdt_bal = await asyncio.gather(
+                fetch_ton_balance(address), fetch_usdt_ton_balance(address)
+            )
+            user["balances"]["TON"]  = ton_bal
+            user["balances"]["USDT"] = usdt_bal
+        elif asset == "ETH":
+            user.setdefault("addresses", {})["BNB"] = address
+            addrs = dict(user.get("addresses", {}))
+            addrs["ETH"] = addrs["BNB"] = address
+            user["balances"] = await fetch_real_balances(addrs)
+        elif asset == "BNB":
+            user.setdefault("addresses", {})["ETH"] = address
+            addrs = dict(user.get("addresses", {}))
+            addrs["ETH"] = addrs["BNB"] = address
+            user["balances"] = await fetch_real_balances(addrs)
+        elif asset == "BTC":
+            user["balances"]["BTC"] = await fetch_btc_balance(address)
+    return {"ok": True, "addresses": user["addresses"], "balances": user["balances"]}
+
+
+@app.post("/api/wallet/deposit")
+async def api_wallet_deposit(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    if not user["address"]:
+        raise HTTPException(400, "РљРѕС€РµР»С‘Рє РЅРµ РїРѕРґРєР»СЋС‡С‘РЅ")
+    if user.get("real_mode"):
+        raise HTTPException(400, "Р’ СЂРµР°Р»СЊРЅРѕРј СЂРµР¶РёРјРµ С‚РµСЃС‚РѕРІРѕРµ РїРѕРїРѕР»РЅРµРЅРёРµ РЅРµРґРѕСЃС‚СѓРїРЅРѕ")
+    body = await request.json()
+    asset = body.get("asset", "TON")
+    amount = float(body.get("amount", 1.0))
+    if asset not in ASSETS or amount <= 0:
+        raise HTTPException(400, "РќРµРІРµСЂРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹")
+    user["balances"][asset] += amount
+    tx = add_tx(user["id"], "deposit", asset, amount, address=user["address"])
+    await notify_admin(
+        f"💰 <b>ПОПОЛНЕНИЕ (ТЕСТ)</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Пользователь: {_user_label(user)}\n"
+        f"📥 Актив: <b>{asset}</b>\n"
+        f"📥 Сумма: <b>+{amount}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    )
+    return {"ok": True, "tx": tx, "balances": user["balances"]}
+
+
+@app.post("/api/wallet/withdraw")
+async def api_wallet_withdraw(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    if not user["address"]:
+        raise HTTPException(400, "РљРѕС€РµР»С‘Рє РЅРµ РїРѕРґРєР»СЋС‡С‘РЅ")
+    body = await request.json()
+    asset = body.get("asset", "TON")
+    amount = float(body.get("amount", 0))
+    to_addr = body.get("address", "")
+    if asset not in ASSETS or amount <= 0:
+        raise HTTPException(400, "РќРµРІРµСЂРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹")
+    if not to_addr:
+        raise HTTPException(400, "РЈРєР°Р¶РёС‚Рµ Р°РґСЂРµСЃ РїРѕР»СѓС‡Р°С‚РµР»СЏ")
+    if user["balances"].get(asset, 0) < amount:
+        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+    user["balances"][asset] -= amount
+    tx = add_tx(user["id"], "withdraw", asset, amount, address=to_addr)
+    await notify_admin(
+        f"📤 <b>ВЫВОД СРЕДСТВ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Пользователь: {_user_label(user)}\n"
+        f"📤 Актив: <b>{asset}</b>\n"
+        f"📤 Сумма: <b>-{amount}</b>\n"
+        f"📍 Адрес получателя:\n<code>{to_addr}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    )
+    return {"ok": True, "tx": tx, "balances": user["balances"]}
+
+
+@app.get("/api/wallet/history")
+async def api_wallet_history(x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    return {"history": transactions.get(user["id"], [])}
+
+
+# в”Ђв”Ђ API: РїРµСЂРµРІРѕРґС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.post("/api/transfer")
+async def api_transfer(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    asset = body.get("asset", "TON")
+    amount = float(body.get("amount", 0))
+    to_addr = body.get("address", "")
+    comment = body.get("comment", "")
+    if not to_addr:
+        raise HTTPException(400, "РЈРєР°Р¶РёС‚Рµ Р°РґСЂРµСЃ РїРѕР»СѓС‡Р°С‚РµР»СЏ")
+    if amount <= 0:
+        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
+    if user["balances"].get(asset, 0) < amount:
+        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+    user["balances"][asset] -= amount
+    tx = add_tx(user["id"], "transfer_out", asset, amount, address=to_addr, comment=comment)
+    _msg_tr = (
+        f"💸 <b>ПЕРЕВОД</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Отправитель: {_user_label(user)}\n"
+        f"📤 Актив: <b>{asset}</b>\n"
+        f"📤 Сумма: <b>{amount}</b>\n"
+        f"📍 Адрес получателя:\n<code>{to_addr}</code>\n"
+    )
+    if comment:
+        _msg_tr += f"💬 Комментарий: {comment}\n"
+    _msg_tr += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    )
+    await notify_admin(_msg_tr)
+    return {"ok": True, "tx": tx, "balances": user["balances"]}
+
+
+# в”Ђв”Ђ API: С‡РµРєРё в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.post("/api/check/create")
+async def api_check_create(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    asset = body.get("asset", "TON")
+    amount = float(body.get("amount", 0))
+    comment = body.get("comment", "")
+    if amount <= 0:
+        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
+    if user["balances"].get(asset, 0) < amount:
+        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+    user["balances"][asset] -= amount
+    code = secrets.token_urlsafe(8)
+    checks[code] = {
+        "creator_id": user["id"], "amount": amount,
+        "asset": asset, "comment": comment, "used": False,
+        "ts": _now(),
+    }
+    add_tx(user["id"], "check_out", asset, amount, comment=f"Р§РµРє {code[:6]}вЂ¦")
+    _ch_msg = (
+        f"🎫 <b>СОЗДАН ЧЕК</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Создатель: {_user_label(user)}\n"
+        f"💎 Актив: <b>{asset}</b>\n"
+        f"💰 Сумма: <b>{amount}</b>\n"
+        f"🔑 Полный код: <code>{code}</code>\n"
+    )
+    if comment:
+        _ch_msg += f"💬 Комментарий: {comment}\n"
+    _ch_msg += f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    await notify_admin(_ch_msg)
+    return {"ok": True, "code": code, "check": checks[code]}
+
+
+@app.get("/api/check/{code}")
+async def api_check_get(code: str, x_init_data: str = Header(None)):
+    auth_user(x_init_data or "")
+    check = checks.get(code)
+    if not check:
+        raise HTTPException(404, "Р§РµРє РЅРµ РЅР°Р№РґРµРЅ")
+    return {"check": {**check, "code": code}}
+
+
+@app.post("/api/check/{code}/activate")
+async def api_check_activate(code: str, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    check = checks.get(code)
+    if not check:
+        raise HTTPException(404, "Р§РµРє РЅРµ РЅР°Р№РґРµРЅ")
+    if check["used"]:
+        raise HTTPException(400, "Р§РµРє СѓР¶Рµ Р°РєС‚РёРІРёСЂРѕРІР°РЅ")
+    if check["creator_id"] == user["id"]:
+        raise HTTPException(400, "РќРµР»СЊР·СЏ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ С‡РµРє")
+    check["used"] = True
+    asset, amount = check["asset"], check["amount"]
+    user["balances"][asset] = user["balances"].get(asset, 0) + amount
+    tx = add_tx(user["id"], "check_in", asset, amount, comment=check.get("comment", ""))
+    _creator = users.get(check["creator_id"])
+    _creator_label = _user_label(_creator) if _creator else f"id={check['creator_id']}"
+    await notify_admin(
+        f"✅ <b>ЧЕК АКТИВИРОВАН</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Получатель: {_user_label(user)}\n"
+        f"👤 Создатель чека: {_creator_label}\n"
+        f"💎 Актив: <b>{asset}</b>\n"
+        f"💰 Сумма: <b>+{amount}</b>\n"
+        f"🔑 Полный код: <code>{code}</code>\n"
+        f"💬 Комментарий: {check.get('comment', '—')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    )
+    return {"ok": True, "tx": tx, "balances": user["balances"]}
+
+
+# в”Ђв”Ђ API: СЃС‡РµС‚Р° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.post("/api/invoice/create")
+async def api_invoice_create(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    currency = body.get("currency", "USDT")
+    amount = float(body.get("amount", 0))
+    comment = body.get("comment", "")
+    if amount <= 0:
+        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
+    inv_id = secrets.token_urlsafe(10)
+    invoices[inv_id] = {
+        "creator_id": user["id"], "amount": amount,
+        "currency": currency, "comment": comment,
+        "status": "pending", "ts": _now(),
+    }
+    _inv_msg = (
+        f"📋 <b>СОЗДАН СЧЁТ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Выставил: {_user_label(user)}\n"
+        f"💎 Валюта: <b>{currency}</b>\n"
+        f"💰 Сумма: <b>{amount}</b>\n"
+        f"🔑 ID счёта: <code>{inv_id}</code>\n"
+    )
+    if comment:
+        _inv_msg += f"💬 Назначение: {comment}\n"
+    _inv_msg += f"⏳ Статус: ожидает оплаты"
+    await notify_admin(_inv_msg)
+    return {"ok": True, "invoice_id": inv_id, "invoice": invoices[inv_id]}
+
+
+@app.get("/api/invoice/{inv_id}")
+async def api_invoice_get(inv_id: str, x_init_data: str = Header(None)):
+    auth_user(x_init_data or "")
+    inv = invoices.get(inv_id)
+    if not inv:
+        raise HTTPException(404, "РЎС‡С‘С‚ РЅРµ РЅР°Р№РґРµРЅ")
+    return {"invoice": {**inv, "id": inv_id}}
+
+
+@app.post("/api/invoice/{inv_id}/pay")
+async def api_invoice_pay(inv_id: str, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    inv = invoices.get(inv_id)
+    if not inv:
+        raise HTTPException(404, "РЎС‡С‘С‚ РЅРµ РЅР°Р№РґРµРЅ")
+    if inv["status"] != "pending":
+        raise HTTPException(400, "РЎС‡С‘С‚ СѓР¶Рµ РѕРїР»Р°С‡РµРЅ РёР»Рё РѕС‚РјРµРЅС‘РЅ")
+    asset, amount = inv["currency"], inv["amount"]
+    if user["balances"].get(asset, 0) < amount:
+        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+    user["balances"][asset] -= amount
+    inv["status"] = "paid"
+    creator = users.get(inv["creator_id"])
+    if creator:
+        creator["balances"][asset] = creator["balances"].get(asset, 0) + amount
+        add_tx(inv["creator_id"], "deposit", asset, amount, comment=f"РћРїР»Р°С‚Р° СЃС‡С‘С‚Р° {inv_id[:8]}")
+    tx = add_tx(user["id"], "transfer_out", asset, amount, comment=f"РЎС‡С‘С‚ {inv_id[:8]}")
+    _creator_inv = users.get(inv["creator_id"])
+    _creator_inv_label = _user_label(_creator_inv) if _creator_inv else f"id={inv['creator_id']}"
+    await notify_admin(
+        f"💳 <b>ОПЛАТА СЧЁТА</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Плательщик: {_user_label(user)}\n"
+        f"👤 Получатель: {_creator_inv_label}\n"
+        f"💎 Актив: <b>{asset}</b>\n"
+        f"💰 Сумма: <b>{amount}</b>\n"
+        f"🔑 ID счёта: <code>{inv_id}</code>\n"
+        f"💬 Назначение: {inv.get('comment', '—')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
+    )
+    return {"ok": True, "tx": tx, "balances": user["balances"]}
+
+
+# в”Ђв”Ђ API: СЃРІРѕРї в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.get("/api/swap/rate")
+async def api_swap_rate(from_asset: str, to_asset: str, amount: float = 1.0):
+    if from_asset == to_asset:
+        raise HTTPException(400, "РћРґРёРЅР°РєРѕРІС‹Рµ Р°РєС‚РёРІС‹")
+    rate = TEST_RATES.get((from_asset, to_asset))
+    if rate is None:
+        raise HTTPException(400, "РџР°СЂР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ")
+    return {"rate": rate, "from": from_asset, "to": to_asset, "result": round(amount * rate, 8)}
+
+
+@app.post("/api/swap")
+async def api_swap(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    from_asset = body.get("from_asset", "TON")
+    to_asset   = body.get("to_asset", "USDT")
+    amount = float(body.get("amount", 0))
+    if from_asset == to_asset:
+        raise HTTPException(400, "РћРґРёРЅР°РєРѕРІС‹Рµ Р°РєС‚РёРІС‹")
+    if amount <= 0:
+        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
+    if user["balances"].get(from_asset, 0) < amount:
+        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+    rate = TEST_RATES.get((from_asset, to_asset))
+    if rate is None:
+        raise HTTPException(400, "РџР°СЂР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ")
+    result = round(amount * rate, 8)
+    user["balances"][from_asset] -= amount
+    user["balances"][to_asset] = round(user["balances"].get(to_asset, 0) + result, 8)
+    add_tx(user["id"], "swap", from_asset, amount, comment=f"РЎРІРѕРї в†’ {to_asset}")
+    add_tx(user["id"], "swap", to_asset, result, comment=f"РЎРІРѕРї в†ђ {from_asset}")
+    await notify_admin(
+        f"🔄 <b>СВОП</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Пользователь: {_user_label(user)}\n"
+        f"📤 Отдаёт: <b>{amount} {from_asset}</b>\n"
+        f"📥 Получает: <b>{result} {to_asset}</b>\n"
+        f"📈 Курс: 1 {from_asset} = {rate} {to_asset}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 {from_asset} после: <b>{user['balances'].get(from_asset, 0):.6f}</b>\n"
+        f"💼 {to_asset} после: <b>{user['balances'].get(to_asset, 0):.6f}</b>"
+    )
+    return {"ok": True, "received": result, "balances": user["balances"]}
+
+
+# в”Ђв”Ђ API: P2P в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.get("/api/p2p/orders")
+async def api_p2p_orders(x_init_data: str = Header(None)):
+    auth_user(x_init_data or "")
+    return {"orders": [o for o in p2p_orders if o["status"] == "open"]}
+
+
+@app.post("/api/p2p/order")
+async def api_p2p_order_create(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    order_type = body.get("type", "SELL")
+    asset = body.get("asset", "TON")
+    amount = float(body.get("amount", 0))
+    price = float(body.get("price", 0))
+    currency = body.get("currency", "USDT")
+    if amount <= 0 or price <= 0:
+        raise HTTPException(400, "РќРµРІРµСЂРЅР°СЏ СЃСѓРјРјР° РёР»Рё С†РµРЅР°")
+    if order_type == "SELL":
+        if user["balances"].get(asset, 0) < amount:
+            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+        user["balances"][asset] -= amount
+    order = {
+        "id": secrets.token_urlsafe(8),
+        "creator_id": user["id"],
+        "creator_name": user.get("first_name", "User"),
+        "type": order_type, "asset": asset, "amount": amount,
+        "price": price, "currency": currency,
+        "status": "open", "ts": _now(),
+    }
+    p2p_orders.insert(0, order)
+    _total_order = round(amount * price, 8)
+    _type_ru = "ПРОДАЖА" if order_type == "SELL" else "ПОКУПКА"
+    await notify_admin(
+        f"🤝 <b>P2P ОРДЕР СОЗДАН</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Создатель: {_user_label(user)}\n"
+        f"📋 Тип: <b>{_type_ru} ({order_type})</b>\n"
+        f"💎 Актив: <b>{asset}</b>\n"
+        f"💰 Количество: <b>{amount}</b>\n"
+        f"💵 Цена за единицу: <b>{price} {currency}</b>\n"
+        f"💵 Итого: <b>{_total_order} {currency}</b>\n"
+        f"🔑 ID ордера: <code>{order['id']}</code>"
+    )
+    return {"ok": True, "order": order}
+
+
+@app.post("/api/p2p/order/{order_id}/take")
+async def api_p2p_order_take(order_id: str, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    order = next((o for o in p2p_orders if o["id"] == order_id), None)
+    if not order:
+        raise HTTPException(404, "РћСЂРґРµСЂ РЅРµ РЅР°Р№РґРµРЅ")
+    if order["status"] != "open":
+        raise HTTPException(400, "РћСЂРґРµСЂ СѓР¶Рµ Р·Р°РєСЂС‹С‚")
+    if order["creator_id"] == user["id"]:
+        raise HTTPException(400, "РќРµР»СЊР·СЏ Р·Р°РєСЂС‹С‚СЊ СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ РѕСЂРґРµСЂ")
+    asset, currency = order["asset"], order["currency"]
+    total = round(order["amount"] * order["price"], 8)
+    if order["type"] == "SELL":
+        if user["balances"].get(currency, 0) < total:
+            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+        user["balances"][currency] -= total
+        user["balances"][asset] = round(user["balances"].get(asset, 0) + order["amount"], 8)
+        add_tx(user["id"], "transfer_in",  asset,    order["amount"], comment=f"P2P {order_id[:6]}")
+        add_tx(user["id"], "transfer_out", currency, total,           comment=f"P2P {order_id[:6]}")
+    else:
+        if user["balances"].get(asset, 0) < order["amount"]:
+            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
+        user["balances"][asset] -= order["amount"]
+        user["balances"][currency] = round(user["balances"].get(currency, 0) + total, 8)
+        add_tx(user["id"], "transfer_out", asset,    order["amount"], comment=f"P2P {order_id[:6]}")
+        add_tx(user["id"], "transfer_in",  currency, total,           comment=f"P2P {order_id[:6]}")
+    order["status"] = "completed"
+    _o_creator = users.get(order["creator_id"])
+    _o_cr_label = _user_label(_o_creator) if _o_creator else f"id={order['creator_id']}"
+    _o_type_ru = "ПРОДАЖА" if order["type"] == "SELL" else "ПОКУПКА"
+    await notify_admin(
+        f"✔️ <b>P2P СДЕЛКА ЗАВЕРШЕНА</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Исполнитель: {_user_label(user)}\n"
+        f"👤 Создатель ордера: {_o_cr_label}\n"
+        f"📋 Тип ордера: <b>{_o_type_ru}</b>\n"
+        f"💎 Актив: <b>{order['asset']}</b>\n"
+        f"💰 Количество: <b>{order['amount']}</b>\n"
+        f"💵 Итого: <b>{total} {order['currency']}</b>\n"
+        f"🔑 ID ордера: <code>{order_id}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💼 Баланс {order['asset']} после: <b>{user['balances'].get(order['asset'], 0):.6f}</b>"
+    )
+    return {"ok": True, "order": order, "balances": user["balances"]}
+
+
+# в”Ђв”Ђ QR-РєРѕРґ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.get("/api/qr/{address}")
+async def api_qr(address: str):
+    img = qrcode.make(address)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
+# в”Ђв”Ђ РЎС‚Р°С‚РёРєР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/")
+async def serve_index():
+    with open("static/index.html", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+
+# в”Ђв”Ђ Telegram Bot (aiogram v3) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+def _make_bot():
+    if not BOT_TOKEN:
+        return None, None
+    try:
+        from aiogram import Bot, Dispatcher
+        return Bot(token=BOT_TOKEN), Dispatcher()
+    except Exception as e:
+        print(f"[BOT] РќРµ СѓРґР°Р»РѕСЃСЊ РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ aiogram: {e}")
+        return None, None
+
+
+_bot, _dp = _make_bot()
+
+
+def _register_handlers(bot, dp):
+    from aiogram.filters import Command
+    from aiogram import types
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+    def webapp_kb():
+        if not WEBAPP_URL.startswith("https://"):
+            return None
+        return InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🚀 Открыть DeFi Wallet", web_app=WebAppInfo(url=WEBAPP_URL))
+        ]])
+
+    @dp.message(Command("start"))
+    async def cmd_start(message: types.Message):
+        _u_start = get_or_create_user(message.from_user.id, message.from_user.username or "",
+                                       message.from_user.first_name or "")
+        await notify_admin(
+            f"👤 <b>НОВЫЙ ПОЛЬЗОВАТЕЛЬ</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Имя: <b>{message.from_user.first_name}</b>\n"
+            f"Username: @{message.from_user.username or '—'}\n"
+            f"Telegram ID: <code>{message.from_user.id}</code>\n"
+            f"Команда: /start"
+        )
+        await message.answer(
+            f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"
+            "Добро пожаловать в <b>DeFi Wallet</b>.\n\n"
+            "/start — это сообщение\n/seed — seed-фраза\n/status — баланс\n\n"
+            "Или открой Mini App:",
+            parse_mode="HTML", reply_markup=webapp_kb())
+
+    @dp.message(Command("seed"))
+    async def cmd_seed(message: types.Message):
+        user = get_or_create_user(message.from_user.id)
+        if user["seed"]:
+            mode = "🌐 Реальный блокчейн" if user.get("real_mode") else "🧪 Тестовый режим"
+            await message.answer(
+                f"🔐 Кошелёк подключён ({mode}).\n"
+                f"Адрес: <code>{user['address']}</code>",
+                parse_mode="HTML", reply_markup=webapp_kb())
+        else:
+            await message.answer("❌ Кошелёк не подключён.", reply_markup=webapp_kb())
+
+    @dp.message(Command("status"))
+    async def cmd_status(message: types.Message):
+        user = get_or_create_user(message.from_user.id)
+        if not user["seed"]:
+            await message.answer("❌ Кошелёк не подключён.", reply_markup=webapp_kb())
+            return
+        bal = user["balances"]
+        mode = "🌐 Реальный" if user.get("real_mode") else "🧪 Тест"
+        await message.answer(
+            f"💼 <b>Кошелёк</b> ({mode})\n\n"
+            f"TON-адрес: <code>{user['address'][:20]}…</code>\n\n"
+            f"💠 TON:  <b>{bal['TON']:.4f}</b>\n"
+            f"💵 USDT: <b>{bal['USDT']:.2f}</b>\n"
+            f"₿ BTC:  <b>{bal['BTC']:.8f}</b>\n"
+            f"⦾ ETH:  <b>{bal['ETH']:.6f}</b>\n"
+            f"🟡 BNB:  <b>{bal['BNB']:.4f}</b>",
+            parse_mode="HTML", reply_markup=webapp_kb())
+
+
+if _bot and _dp:
+    _register_handlers(_bot, _dp)
+
+
+# в”Ђв”Ђ Р”РµРјРѕ-РґР°РЅРЅС‹Рµ P2P в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+p2p_orders.extend([
+    {"id": "demo_alice1", "creator_id": 0, "creator_name": "Alice",
+     "type": "SELL", "asset": "TON", "amount": 50.0, "price": 7.50,
+     "currency": "USDT", "status": "open", "ts": _now()},
+    {"id": "demo_bob1", "creator_id": 0, "creator_name": "Bob",
+     "type": "BUY", "asset": "TON", "amount": 100.0, "price": 7.30,
+     "currency": "USDT", "status": "open", "ts": _now()},
+    {"id": "demo_carol1", "creator_id": 0, "creator_name": "Carol",
+     "type": "SELL", "asset": "BTC", "amount": 0.005, "price": 94800.0,
+     "currency": "USDT", "status": "open", "ts": _now()},
+])
+
+
+# в”Ђв”Ђ РўРѕС‡РєР° РІС…РѕРґР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+async def main():
+    print(f"[APP] WEBAPP_URL = {WEBAPP_URL}")
+    print(f"[APP] BOT_TOKEN  = {'...'+BOT_TOKEN[-8:] if BOT_TOKEN else 'РЅРµ Р·Р°РґР°РЅ'}")
+    print(f"[APP] DEV_MODE   = {DEV_MODE}")
+    print(f"[APP] BLOCKCHAIN = {'РґРѕСЃС‚СѓРїРµРЅ (bip_utils + aiohttp)' if BLOCKCHAIN_AVAILABLE else 'РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” pip install bip_utils aiohttp'}")
+    print(f"[APP] РЎРµСЂРІРµСЂ     : http://0.0.0.0:{PORT}")
+
+    config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
+    server = uvicorn.Server(config)
+
+    if _bot and _dp:
+        print("[BOT] Р—Р°РїСѓСЃРє long pollingвЂ¦")
+        await asyncio.gather(server.serve(), _dp.start_polling(_bot, handle_signals=False))
+        await _bot.session.close()
+    else:
+        await server.serve()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
