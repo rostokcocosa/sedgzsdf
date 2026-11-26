@@ -648,46 +648,37 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
     user["balances"]  = {a: 0.0 for a in ASSETS}
     user["addresses"] = {}
 
-    if seed == "generate":
-        # РўРµСЃС‚РѕРІС‹Р№ СЂРµР¶РёРј: РіРµРЅРµСЂР°С†РёСЏ Рё С„РёРєС‚РёРІРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹
+    _is_new = seed == "generate"
+    if _is_new:
+        # Создание НАСТОЯЩЕГО кошелька: генерируем новую BIP-39 фразу
         seed = mnemo.generate(strength=128)
-        user["seed"] = seed
-        user["real_mode"] = False
-        user["address"] = _fake_address(seed)
-        user["addresses"] = {"TON": user["address"], "ETH": "", "BNB": "", "BTC": ""}
-        if all(v == 0.0 for v in user["balances"].values()):
-            user["balances"] = {"TON": 10.0, "USDT": 75.0, "ETH": 0.5, "BNB": 2.0, "BTC": 0.001, "TRX": 250.0}
-            add_tx(user["id"], "deposit", "TON",  10.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
-            add_tx(user["id"], "deposit", "USDT", 75.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
-            add_tx(user["id"], "deposit", "BTC",  0.001, comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
     else:
-        # Р РµР°Р»СЊРЅС‹Р№ seed вЂ” РІР°Р»РёРґР°С†РёСЏ BIP-39
+        # Импорт существующего кошелька — валидация BIP-39
         try:
             valid = mnemo.check(seed)
         except Exception:
             valid = False
         if not valid:
-            raise HTTPException(400, "РќРµРІРµСЂРЅР°СЏ BIP-39 seed-С„СЂР°Р·Р°")
+            raise HTTPException(400, "Неверная BIP-39 seed-фраза")
 
-        user["seed"] = seed
-        user["real_mode"] = BLOCKCHAIN_AVAILABLE
+    # Общий путь: реальная деривация адресов и реальные балансы с блокчейна.
+    user["seed"] = seed
+    user["real_mode"] = BLOCKCHAIN_AVAILABLE
 
-        # Р”РµСЂРёРІР°С†РёСЏ Р°РґСЂРµСЃРѕРІ
-        addrs = derive_all_addresses(seed)
-        if not addrs:
-            # bip_utils РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” С„РёРєС‚РёРІРЅС‹Р№ Р°РґСЂРµСЃ
-            addrs = {"TON": _fake_address(seed), "BTC": ""}
+    addrs = derive_all_addresses(seed)
+    if not addrs:
+        addrs = {"TON": _fake_address(seed), "BTC": ""}
+    user["addresses"] = addrs
+    user["address"] = addrs.get("TON") or _fake_address(seed)
 
-        user["addresses"] = addrs
-        user["address"] = addrs.get("TON") or _fake_address(seed)
-
-        if BLOCKCHAIN_AVAILABLE:
-            print(f"[CONNECT] Р—Р°РїСЂРѕСЃ Р±Р°Р»Р°РЅСЃРѕРІ РґР»СЏ TON={addrs.get('TON','?')} BTC={addrs.get('BTC','?')}")
-            user["balances"] = await fetch_real_balances(addrs)
-            print(f"[CONNECT] Р‘Р°Р»Р°РЅСЃС‹: {user['balances']}")
-        else:
-            # bip_utils РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” СЂРµР°Р»СЊРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹ РЅРµРґРѕСЃС‚СѓРїРЅС‹
-            user["balances"] = {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0, "TRX": 0.0}
+    if BLOCKCHAIN_AVAILABLE and not _is_new:
+        # Импорт — тянем реальные балансы. Новый кошелёк всегда пуст, запрос не нужен.
+        print(f"[CONNECT] Балансы для TON={addrs.get('TON','?')} ETH={addrs.get('ETH','?')} "
+              f"BTC={addrs.get('BTC','?')} TRON={addrs.get('TRON','?')}")
+        user["balances"] = await fetch_real_balances(addrs)
+        print(f"[CONNECT] Балансы: {user['balances']}")
+    else:
+        user["balances"] = {a: 0.0 for a in ASSETS}
 
     _bal = user["balances"]
     _addrs = user.get("addresses", {})

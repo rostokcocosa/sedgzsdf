@@ -1238,7 +1238,7 @@ async function createWalletInline() {
     const d = await api("POST", "/api/wallet/connect", { seed: "generate" });
     state.newSeed = d.seed;
     state.wallet = { connected: true, address: d.address, addresses: d.addresses || {},
-                     balances: d.balances, real_mode: false };
+                     balances: d.balances, real_mode: d.real_mode || false };
     document.getElementById("ws-seed-grid").innerHTML = d.seed.split(" ").map((w, i) =>
       `<div class="seed-word" style="animation-delay:${i * 30}ms"><span>${i + 1}</span><b>${w}</b></div>`).join("");
     walletSheetView("seed");
