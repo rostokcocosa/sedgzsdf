@@ -18,6 +18,7 @@
   --border:      color-mix(in srgb, var(--text) 9%, transparent);
   --green:#2fb171; --green-soft:rgba(47,177,113,.14);
   --red:#e5484d;   --red-soft:rgba(229,72,77,.14);
+  --red-strong:  color-mix(in srgb, var(--red) 65%, black);  /* читаемый текст на --red-soft */
   --yellow:#f3a81b;--yellow-soft:rgba(243,168,27,.16);
   --radius:18px; --radius-sm:13px;
 }
@@ -25,6 +26,7 @@
   :root{
     --page:#0f1317; --card:#1b2026; --text:#f4f6f8; --hint:#8a929c;
     --border:rgba(255,255,255,.08);
+    --red-strong: color-mix(in srgb, var(--red) 72%, white);
   }
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -297,7 +299,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .pf-wallet-name{font-weight:600;font-size:15px}
 .pf-wallet-addr{font-size:12px;color:var(--hint);font-family:ui-monospace,monospace;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pf-seed-warning{background:var(--red-soft);color:var(--red);border-radius:12px;padding:11px 13px;
+.pf-seed-warning{background:var(--red-soft);color:var(--red-strong);border-radius:12px;padding:11px 13px;
   font-size:13px;margin-bottom:12px;line-height:1.5;font-weight:500}
 .wallet-row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--border);
   cursor:pointer}
@@ -331,6 +333,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 html[data-scheme="dark"]{
   --page:#07090d; --card:#141820; --text:#f4f6f8; --hint:#8e97a3;
   --border:rgba(255,255,255,.08);
+  --red-strong: color-mix(in srgb, var(--red) 72%, white);
   --g-fill:   rgba(40,46,58,.42);
   --g-fill-2: rgba(40,46,58,.28);
   --g-edge:   rgba(255,255,255,.22);
@@ -608,7 +611,7 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   <div class="page">
     <div class="wallet-switch-wrap">
       <button class="profile-btn" id="profile-btn" onclick="openProfileSheet()">
-        <img id="profile-avatar-img" src="" alt="" style="display:none">
+        <img id="profile-avatar-img" alt="" style="display:none">
         <span class="pf-fallback" id="profile-avatar-fallback">?</span>
       </button>
       <button class="wallet-switch" id="wallet-switch" onclick="openWalletSheet()" style="display:none">
@@ -943,7 +946,7 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   <div id="pf-view-main" class="ws-view">
     <div class="pf-head">
       <div class="pf-avatar" id="pf-avatar">
-        <img id="pf-avatar-img" src="" alt="" style="display:none">
+        <img id="pf-avatar-img" alt="" style="display:none">
         <span id="pf-avatar-fallback">?</span>
       </div>
       <div>
