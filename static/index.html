@@ -517,11 +517,7 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 /* нажатия на строки */
 .wallet-row:active,.asset:active{transform:scale(.985)}
 
-/* 6 вкладок — компактнее за счёт отступов и иконок, но текст ≥11px */
-.bottom-nav{gap:0;padding-left:2px;padding-right:2px}
-.bottom-nav .nav-item{font-size:11px;padding-left:0;padding-right:0;gap:2px}
-.bottom-nav .nav-item span{white-space:nowrap;letter-spacing:-.2px}
-.bottom-nav .nav-item svg{width:21px;height:21px}
+.bottom-nav .nav-item span{white-space:nowrap}
 
 /* стейкинг */
 .stake-row{padding:14px 0;border-bottom:1px solid var(--border)}
@@ -683,59 +679,6 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
         <input id="tr-comment" class="input" placeholder="…"></div>
       <button class="btn" onclick="doTransfer()">Отправить</button>
     </div>
-
-    <div class="card">
-      <h3>Создать чек</h3>
-      <div class="field"><label>Актив</label>
-        <select id="ch-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
-      <div class="field"><label>Сумма</label>
-        <input id="ch-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
-      <div class="field"><label>Комментарий</label>
-        <input id="ch-comment" class="input" placeholder="…"></div>
-      <button class="btn" onclick="createCheck()">Создать чек</button>
-      <div id="check-result" style="display:none" class="result-box">
-        Код чека: <code id="check-code"></code>
-        <button class="btn btn-sec btn-sm" style="margin-top:10px" onclick="copyCheckCode()">Скопировать код</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Активировать чек</h3>
-      <div class="field"><label>Код чека</label>
-        <input id="act-code" class="input" placeholder="Вставьте код…"></div>
-      <button class="btn btn-green" onclick="activateCheck()">Получить</button>
-      <div id="check-info" style="display:none;margin-top:12px;font-size:14px;color:var(--hint)"></div>
-    </div>
-  </div>
-  </div>
-
-  <!-- Вкладка: Счета -->
-  <div id="tab-invoice" class="tab-content" style="display:none">
-  <div class="page">
-    <div class="card">
-      <h3>Выставить счёт</h3>
-      <div class="field"><label>Валюта</label>
-        <select id="inv-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
-      <div class="field"><label>Сумма</label>
-        <input id="inv-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
-      <div class="field"><label>Комментарий / назначение</label>
-        <input id="inv-comment" class="input" placeholder="За что…"></div>
-      <button class="btn" onclick="createInvoice()">Создать счёт</button>
-      <div id="invoice-result" style="display:none" class="result-box">
-        ID счёта: <code id="invoice-id-out"></code>
-        <div style="color:var(--hint);font-size:12px;margin-top:4px">Передайте этот код плательщику</div>
-        <button class="btn btn-sec btn-sm" style="margin-top:10px" onclick="copyInvoiceId()">Скопировать ID</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Оплатить счёт</h3>
-      <div class="field"><label>ID счёта</label>
-        <input id="pay-inv-id" class="input" placeholder="Вставьте ID счёта…"></div>
-      <button class="btn btn-sec" onclick="lookupInvoice()">Проверить</button>
-      <div id="inv-lookup" style="display:none;margin:12px 0;font-size:14px"></div>
-      <button class="btn btn-green" id="btn-pay-inv" style="display:none;margin-top:4px" onclick="payInvoice()">Оплатить</button>
-    </div>
   </div>
   </div>
 
@@ -776,39 +719,6 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   </div>
   </div>
 
-  <!-- Вкладка: P2P -->
-  <div id="tab-p2p" class="tab-content" style="display:none">
-  <div class="page">
-    <div class="card">
-      <h3>Создать ордер</h3>
-      <div class="field"><label>Тип</label>
-        <div style="display:flex;gap:8px">
-          <button id="p2p-buy-btn"  class="btn btn-green btn-sm" onclick="setP2PType('BUY')"  style="flex:1">BUY</button>
-          <button id="p2p-sell-btn" class="btn btn-sec  btn-sm" onclick="setP2PType('SELL')" style="flex:1">SELL</button>
-        </div>
-        <input type="hidden" id="p2p-type" value="BUY">
-      </div>
-      <div class="field"><label>Актив</label>
-        <select id="p2p-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
-      <div class="field"><label>Количество</label>
-        <input id="p2p-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
-      <div class="field"><label>Цена за единицу</label>
-        <input id="p2p-price" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
-      <div class="field"><label>Расчётная валюта</label>
-        <select id="p2p-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
-      <button class="btn" onclick="createOrder()">Разместить ордер</button>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="margin:0">Открытые ордера</h3>
-        <button class="btn btn-sec btn-sm" onclick="loadP2P()">Обновить</button>
-      </div>
-      <div id="p2p-list"><div class="empty">Загрузка…</div></div>
-    </div>
-  </div>
-  </div>
-
   <!-- Вкладка: Стейкинг -->
   <div id="tab-staking" class="tab-content" style="display:none">
   <div class="page">
@@ -843,10 +753,6 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
       <span>Переводы</span>
     </div>
-    <div class="nav-item" data-tab="invoice" onclick="switchTab('invoice')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><path d="M9 13h6M9 17h6"/></svg>
-      <span>Счета</span>
-    </div>
     <div class="nav-item" data-tab="swap" onclick="switchTab('swap')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4v0"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4v0"/></svg>
       <span>Своп</span>
@@ -854,10 +760,6 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
     <div class="nav-item" data-tab="staking" onclick="switchTab('staking')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 7-7"/><path d="M15 9h5v5"/></svg>
       <span>Стейк</span>
-    </div>
-    <div class="nav-item" data-tab="p2p" onclick="switchTab('p2p')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.2A3 3 0 0 1 18 11"/><path d="M18.5 15c2 .6 3.5 2 3.5 4"/></svg>
-      <span>P2P</span>
     </div>
   </nav>
 </div>
@@ -1048,7 +950,7 @@ const ADDR_KEY = { TON:"TON", USDT:"TON", ETH:"ETH", BNB:"ETH", BTC:"BTC", TRX:"
 
 const state = {
   wallet: null, newSeed: null, activeTab: "wallet",
-  currentInvoice: null, realMode: false, addresses: {}, wallets: [],
+  realMode: false, addresses: {}, wallets: [],
 };
 
 // ── API ──
@@ -1100,7 +1002,7 @@ function showApp() {
   badge.style.display = "inline-block";
   document.getElementById("btn-refresh").style.display = state.realMode ? "inline-flex" : "none";
   if (!initData) document.getElementById("dev-banner-app").style.display = "flex";
-  loadHistory(); loadP2P(); loadWallets(); loadProfileHeader();
+  loadHistory(); loadWallets(); loadProfileHeader();
 }
 
 // ── Connect ──
@@ -1183,7 +1085,6 @@ function switchTab(tab) {
   document.querySelectorAll(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   document.querySelectorAll(".tab-content").forEach(el => el.style.display = el.id === "tab-" + tab ? "block" : "none");
   window.scrollTo(0, 0);
-  if (tab === "p2p") loadP2P();
   if (tab === "wallet") loadHistory();
   if (tab === "staking") loadStaking(); else stopStakingPoll();
 }
@@ -1653,79 +1554,6 @@ async function doTransfer() {
     toast(`Переведено ${fmtAmt(amount, asset)} ${asset}`, "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-async function createCheck() {
-  const asset = document.getElementById("ch-asset").value;
-  const amount = parseFloat(document.getElementById("ch-amount").value);
-  const comment = document.getElementById("ch-comment").value.trim();
-  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
-  try {
-    const d = await api("POST", "/api/check/create", { asset, amount, comment });
-    document.getElementById("check-code").textContent = d.code;
-    document.getElementById("check-result").style.display = "block";
-    document.getElementById("ch-amount").value = "";
-    const wd = await api("GET", "/api/wallet"); updateBalances(wd.balances);
-    toast("Чек создан", "ok");
-  } catch (e) { toast(e.message, "err"); }
-}
-function copyCheckCode() {
-  const code = document.getElementById("check-code").textContent;
-  if (code) copyToClipboard(code);
-}
-async function activateCheck() {
-  const code = document.getElementById("act-code").value.trim();
-  if (!code) { toast("Введите код чека", "err"); return; }
-  try {
-    const d = await api("POST", `/api/check/${encodeURIComponent(code)}/activate`);
-    updateBalances(d.balances);
-    document.getElementById("check-info").style.display = "block";
-    document.getElementById("check-info").textContent = `Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
-    document.getElementById("act-code").value = "";
-    toast("Чек активирован", "ok");
-  } catch (e) { toast(e.message, "err"); }
-}
-let _lastInvId = "";
-async function createInvoice() {
-  const currency = document.getElementById("inv-currency").value;
-  const amount = parseFloat(document.getElementById("inv-amount").value);
-  const comment = document.getElementById("inv-comment").value.trim();
-  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
-  try {
-    const d = await api("POST", "/api/invoice/create", { currency, amount, comment });
-    _lastInvId = d.invoice_id;
-    document.getElementById("invoice-id-out").textContent = d.invoice_id;
-    document.getElementById("invoice-result").style.display = "block";
-    document.getElementById("inv-amount").value = "";
-    toast("Счёт создан", "ok");
-  } catch (e) { toast(e.message, "err"); }
-}
-function copyInvoiceId() { if (_lastInvId) copyToClipboard(_lastInvId); }
-async function lookupInvoice() {
-  const id = document.getElementById("pay-inv-id").value.trim();
-  if (!id) { toast("Введите ID счёта", "err"); return; }
-  const info = document.getElementById("inv-lookup"), btn = document.getElementById("btn-pay-inv");
-  try {
-    const d = await api("GET", `/api/invoice/${encodeURIComponent(id)}`);
-    const inv = d.invoice;
-    const sb = inv.status === "pending" ? `<span class="badge badge-pending">ожидает</span>`
-                                        : `<span class="badge badge-paid">оплачен</span>`;
-    info.innerHTML = `<b>${fmtAmt(inv.amount, inv.currency)} ${inv.currency}</b> ${sb}<br>
-      <span style="color:var(--hint)">${inv.comment || "—"}</span>`;
-    info.style.display = "block";
-    btn.style.display = inv.status === "pending" ? "block" : "none";
-    state.currentInvoice = id;
-  } catch (e) { toast(e.message, "err"); }
-}
-async function payInvoice() {
-  if (!state.currentInvoice) return;
-  try {
-    const d = await api("POST", `/api/invoice/${encodeURIComponent(state.currentInvoice)}/pay`);
-    updateBalances(d.balances);
-    document.getElementById("btn-pay-inv").style.display = "none";
-    document.getElementById("inv-lookup").innerHTML += `<br><span style="color:var(--green)">Оплачено</span>`;
-    document.getElementById("pay-inv-id").value = "";
-    toast("Счёт оплачен", "ok"); state.currentInvoice = null;
-  } catch (e) { toast(e.message, "err"); }
-}
 async function updateRate() {
   const from = document.getElementById("sw-from").value, to = document.getElementById("sw-to").value;
   const amount = parseFloat(document.getElementById("sw-amount").value);
@@ -1752,49 +1580,6 @@ async function doSwap() {
     document.getElementById("sw-amount").value = ""; document.getElementById("sw-result").value = "";
     document.getElementById("rate-info").textContent = "Введите сумму для расчёта курса";
     toast(`Получено ${fmtAmt(d.received, to_asset)} ${to_asset}`, "ok");
-  } catch (e) { toast(e.message, "err"); }
-}
-function setP2PType(type) {
-  document.getElementById("p2p-type").value = type;
-  document.getElementById("p2p-buy-btn").className  = type === "BUY"  ? "btn btn-green btn-sm" : "btn btn-sec btn-sm";
-  document.getElementById("p2p-sell-btn").className = type === "SELL" ? "btn btn-danger btn-sm" : "btn btn-sec btn-sm";
-}
-async function loadP2P() {
-  try { const d = await api("GET", "/api/p2p/orders"); renderP2P(d.orders); }
-  catch (e) { document.getElementById("p2p-list").innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`; }
-}
-function renderP2P(orders) {
-  const el = document.getElementById("p2p-list");
-  if (!orders || !orders.length) { el.innerHTML = `<div class="empty">Нет открытых ордеров</div>`; return; }
-  el.innerHTML = orders.map(o => {
-    const total = (o.amount * o.price).toFixed(2), isBuy = o.type === "BUY";
-    return `<div class="order-card">
-      <div class="order-top"><span class="badge ${isBuy?"badge-buy":"badge-sell"}">${o.type}</span>
-        <span style="font-size:12.5px;color:var(--hint)">${o.creator_name}</span></div>
-      <div class="order-info">${fmtAmt(o.amount,o.asset)} ${o.asset} по цене ${o.price} ${o.currency}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="order-price">${total} ${o.currency}</div>
-        <button class="btn btn-sm ${isBuy?"btn-sec":"btn-green"}" onclick="takeOrder('${o.id}')">${isBuy?"Продать":"Купить"}</button>
-      </div></div>`;
-  }).join("");
-}
-async function createOrder() {
-  const type = document.getElementById("p2p-type").value, asset = document.getElementById("p2p-asset").value;
-  const amount = parseFloat(document.getElementById("p2p-amount").value);
-  const price = parseFloat(document.getElementById("p2p-price").value);
-  const currency = document.getElementById("p2p-currency").value;
-  if (!amount || amount <= 0 || !price || price <= 0) { toast("Введите сумму и цену", "err"); return; }
-  try {
-    await api("POST", "/api/p2p/order", { type, asset, amount, price, currency });
-    document.getElementById("p2p-amount").value = ""; document.getElementById("p2p-price").value = "";
-    const wd = await api("GET", "/api/wallet"); updateBalances(wd.balances);
-    toast("Ордер размещён", "ok"); loadP2P();
-  } catch (e) { toast(e.message, "err"); }
-}
-async function takeOrder(id) {
-  try {
-    const d = await api("POST", `/api/p2p/order/${id}/take`);
-    updateBalances(d.balances); toast("Ордер закрыт", "ok"); loadP2P();
   } catch (e) { toast(e.message, "err"); }
 }
 async function refreshBalances() {
