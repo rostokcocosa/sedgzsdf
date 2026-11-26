@@ -5,3 +5,7 @@ __pycache__/
 .DS_Store
 wallet_data.json
 wallet_data.json.tmp
+wallet.db
+wallet.db-journal
+wallet.db-wal
+wallet.db-shm
