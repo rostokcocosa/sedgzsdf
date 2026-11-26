@@ -260,6 +260,26 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 #dev-banner-app{display:none;align-items:center;justify-content:space-between;gap:10px;text-align:left}
 #dev-banner-app button{background:var(--yellow);color:#fff;border:none;border-radius:9px;padding:7px 12px;
   font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0}
+
+/* ── wallet switcher ── */
+.wallet-switch-wrap{text-align:center;margin-bottom:12px}
+.wallet-switch{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:none;
+  border-radius:30px;padding:9px 16px;font-size:15px;font-weight:600;color:var(--text);cursor:pointer;
+  font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.wallet-switch:active{transform:scale(.97)}
+.wallet-switch svg{width:16px;height:16px;color:var(--hint)}
+.wallet-row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--border);
+  cursor:pointer}
+.wallet-row:last-child{border-bottom:none}
+.wallet-row:active{opacity:.6}
+.wallet-av{width:42px;height:42px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+.wallet-row-main{flex:1;min-width:0}
+.wallet-row-name{font-weight:600;font-size:15px}
+.wallet-row-addr{font-size:12.5px;color:var(--hint);font-family:ui-monospace,monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wallet-check{color:var(--accent);flex-shrink:0}
+.wallet-check svg{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -318,6 +338,13 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   <!-- Вкладка: Кошелёк -->
   <div id="tab-wallet" class="tab-content" style="display:block">
   <div class="page">
+    <div class="wallet-switch-wrap">
+      <button class="wallet-switch" id="wallet-switch" onclick="openWalletSheet()" style="display:none">
+        <span id="ws-name">Кошелёк</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
     <div id="dev-banner-app">
       <span>Режим разработки</span>
       <button onclick="openDepositSheet()">Начислить тест</button>
@@ -372,7 +399,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
     <div class="card">
       <h3>Перевод по адресу</h3>
       <div class="field"><label>Актив</label>
-        <select id="tr-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+        <select id="tr-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
       <div class="field"><label>Адрес получателя</label>
         <input id="tr-addr" class="input" placeholder="EQ…"></div>
       <div class="field"><label>Сумма</label>
@@ -385,7 +412,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
     <div class="card">
       <h3>Создать чек</h3>
       <div class="field"><label>Актив</label>
-        <select id="ch-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+        <select id="ch-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
       <div class="field"><label>Сумма</label>
         <input id="ch-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
       <div class="field"><label>Комментарий</label>
@@ -413,7 +440,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
     <div class="card">
       <h3>Выставить счёт</h3>
       <div class="field"><label>Валюта</label>
-        <select id="inv-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+        <select id="inv-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
       <div class="field"><label>Сумма</label>
         <input id="inv-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
       <div class="field"><label>Комментарий / назначение</label>
@@ -445,7 +472,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
       <div class="field"><label>Отдаёте</label>
         <div style="display:flex;gap:8px">
           <select id="sw-from" class="input" style="width:118px;flex-shrink:0" onchange="updateRate()">
-            <option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option>
+            <option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option>
           </select>
           <input id="sw-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00" oninput="updateRate()">
         </div>
@@ -454,7 +481,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
       <div class="field" style="margin-bottom:0"><label>Получаете</label>
         <div style="display:flex;gap:8px">
           <select id="sw-to" class="input" style="width:118px;flex-shrink:0" onchange="updateRate()">
-            <option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option>
+            <option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option>
           </select>
           <input id="sw-result" class="input" readonly placeholder="—" style="color:var(--hint)">
         </div>
@@ -487,13 +514,13 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
         <input type="hidden" id="p2p-type" value="BUY">
       </div>
       <div class="field"><label>Актив</label>
-        <select id="p2p-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+        <select id="p2p-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
       <div class="field"><label>Количество</label>
         <input id="p2p-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
       <div class="field"><label>Цена за единицу</label>
         <input id="p2p-price" class="input" type="number" min="0.001" step="any" placeholder="0.00"></div>
       <div class="field"><label>Расчётная валюта</label>
-        <select id="p2p-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
+        <select id="p2p-currency" class="input"><option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option><option>TRX</option></select></div>
       <button class="btn" onclick="createOrder()">Разместить ордер</button>
     </div>
 
@@ -607,6 +634,15 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   <button class="btn btn-green" style="margin-top:8px" onclick="doDeposit()">Зачислить</button>
 </div>
 
+<!-- Мои кошельки -->
+<div id="wallets-sheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Мои кошельки</div>
+  <div class="sheet-note">Выберите активный кошелёк или добавьте новый.</div>
+  <div id="wallets-list"></div>
+  <button class="btn btn-sec" style="margin-top:14px" onclick="addWallet()">+ Добавить кошелёк</button>
+</div>
+
 <!-- Адреса вручную -->
 <div id="override-sheet" class="sheet">
   <div class="sheet-handle"></div>
@@ -626,21 +662,22 @@ const tg = window.Telegram?.WebApp;
 const initData = tg?.initData || "";
 const BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
 
-const RATES = { TON: 7.5, USDT: 1, ETH: 3200, BNB: 600, BTC: 95000 };
-const ASSET_LIST = ["TON", "USDT", "ETH", "BNB", "BTC"];
+const RATES = { TON: 7.5, USDT: 1, ETH: 3200, BNB: 600, BTC: 95000, TRX: 0.30 };
+const ASSET_LIST = ["TON", "USDT", "ETH", "BNB", "BTC", "TRX"];
 const COIN_META = {
   TON:  { name:"Toncoin",  img:"ton.svg",  net:"Сеть TON" },
   USDT: { name:"Tether",   img:"usdt.svg", net:"Сеть TON (Jetton)" },
   ETH:  { name:"Ethereum", img:"eth.svg",  net:"Сеть Ethereum (ERC-20)" },
   BNB:  { name:"BNB",      img:"bnb.svg",  net:"Сеть BNB Smart Chain" },
   BTC:  { name:"Bitcoin",  img:"btc.svg",  net:"Сеть Bitcoin" },
+  TRX:  { name:"TRON",     img:"trx.svg",  net:"Сеть Tron (TRC-20)" },
 };
 // какой адрес показывать для каждой монеты
-const ADDR_KEY = { TON:"TON", USDT:"TON", ETH:"ETH", BNB:"ETH", BTC:"BTC" };
+const ADDR_KEY = { TON:"TON", USDT:"TON", ETH:"ETH", BNB:"ETH", BTC:"BTC", TRX:"TRON" };
 
 const state = {
   wallet: null, newSeed: null, activeTab: "wallet",
-  currentInvoice: null, realMode: false, addresses: {},
+  currentInvoice: null, realMode: false, addresses: {}, wallets: [],
 };
 
 // ── API ──
@@ -692,7 +729,7 @@ function showApp() {
   badge.style.display = "inline-block";
   document.getElementById("btn-refresh").style.display = state.realMode ? "inline-flex" : "none";
   if (!initData) document.getElementById("dev-banner-app").style.display = "flex";
-  loadHistory(); loadP2P();
+  loadHistory(); loadP2P(); loadWallets();
 }
 
 // ── Connect ──
@@ -899,6 +936,46 @@ async function applyAddrOverride() {
   } catch (e) { toast(e.message, "err"); }
 }
 
+// ── Мультикошелёк ──
+async function loadWallets() {
+  try {
+    const d = await api("GET", "/api/wallets");
+    state.wallets = d.wallets || [];
+    const active = state.wallets.find(w => w.active) || state.wallets[state.wallets.length - 1];
+    const sw = document.getElementById("wallet-switch");
+    if (active) { document.getElementById("ws-name").textContent = active.name; sw.style.display = "inline-flex"; }
+    else sw.style.display = "none";
+  } catch (_) {}
+}
+function openWalletSheet() {
+  const el = document.getElementById("wallets-list");
+  const check = `<span class="wallet-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>`;
+  el.innerHTML = (state.wallets || []).map(w => `
+    <div class="wallet-row" onclick="switchWallet(${w.index})">
+      <div class="wallet-av">${(String(w.name).match(/\d+/) || ["●"])[0]}</div>
+      <div class="wallet-row-main">
+        <div class="wallet-row-name">${w.name}${w.real_mode ? "" : " · тест"}</div>
+        <div class="wallet-row-addr">${w.address ? w.address.slice(0, 20) + "…" : ""}</div>
+      </div>
+      ${w.active ? check : ""}
+    </div>`).join("");
+  openSheet("wallets-sheet");
+}
+async function switchWallet(idx) {
+  try {
+    const d = await api("POST", "/api/wallets/switch", { index: idx });
+    state.wallet = d;
+    closeSheets();
+    showApp();
+    toast("Кошелёк переключён", "ok");
+  } catch (e) { toast(e.message, "err"); }
+}
+function addWallet() {
+  closeSheets();
+  document.getElementById("seed-input").value = "";
+  showScreen("connect");
+}
+
 // ── Экран актива ──
 let _assetOpen = null;
 function openAsset(asset) {
@@ -920,14 +997,23 @@ function renderAssetDetail(asset) {
   document.getElementById("as-fiat").textContent = fmtUsd(bal * (RATES[asset] || 0));
 }
 async function loadAssetHistory(asset) {
-  try { const d = await api("GET", "/api/wallet/history"); renderAssetHistory(d.history, asset); }
-  catch (_) {}
-}
-function renderAssetHistory(list, asset) {
   const el = document.getElementById("as-tx");
-  const f = (list || []).filter(t => t.asset === asset);
-  el.innerHTML = f.length ? f.slice(0, 50).map(txRow).join("")
-    : `<div class="empty">Нет операций по ${asset}</div>`;
+  el.innerHTML = `<div class="empty">Загрузка…</div>`;
+  try {
+    const d = await api("GET", `/api/wallet/onchain?asset=${asset}`);
+    if (_assetOpen !== asset) return;
+    renderAssetHistory(d.history, asset, d);
+  } catch (_) {
+    if (_assetOpen === asset) el.innerHTML = `<div class="empty">Не удалось загрузить операции</div>`;
+  }
+}
+function renderAssetHistory(list, asset, meta) {
+  const el = document.getElementById("as-tx");
+  if (list && list.length) { el.innerHTML = list.slice(0, 50).map(txRow).join(""); return; }
+  let msg = `Нет операций по ${asset}`;
+  if (meta && meta.onchain && meta.supported === false)
+    msg = `История ${asset} появится позже — нужен ключ эксплорера`;
+  el.innerHTML = `<div class="empty">${msg}</div>`;
 }
 
 // ── История ──
