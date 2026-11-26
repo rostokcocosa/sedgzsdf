@@ -459,13 +459,44 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 #toast.err{background:color-mix(in srgb, var(--red) 80%, transparent);color:#fff}
 .badge{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 
+/* ── инлайн-создание кошелька в стеклянной шторке ── */
+.ws-back{background:none;border:none;color:var(--accent);font-size:15px;font-weight:600;
+  cursor:pointer;font-family:inherit;padding:0 0 8px;margin-top:-2px}
+.ws-anim{animation:wsIn .36s cubic-bezier(.2,.9,.3,1) both}
+@keyframes wsIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+
+/* появление строк списка и слов seed (со сдвигом через inline-delay) */
+.wallet-row,.seed-word{animation:rowIn .42s cubic-bezier(.2,.9,.3,1) both}
+@keyframes rowIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+/* живой стеклянный блик, медленно скользящий по hero */
+.hero{overflow:hidden}
+.hero::before{animation:heroSheen 9s ease-in-out infinite alternate}
+@keyframes heroSheen{from{transform:translateX(-5%) translateY(0)}to{transform:translateX(7%) translateY(2%)}}
+
+/* баланс — лёгкий градиент в стекле */
+.hero-total{background:linear-gradient(177deg, var(--text), color-mix(in srgb, var(--text) 68%, var(--accent)));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+html[data-scheme="dark"] .hero-total{
+  background:linear-gradient(177deg, #fff, color-mix(in srgb, #fff 70%, var(--accent)));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* шторка открывается с лёгким пружинным овершутом */
+.sheet{transition:transform .42s cubic-bezier(.22,1.12,.32,1)}
+
+/* нажатия на строки */
+.wallet-row:active,.asset:active{transform:scale(.985)}
+
 /* доступность: без прозрачности и анимаций, если пользователь так настроил */
 @media (prefers-reduced-transparency:reduce){
   .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.chip,.qa-ic,.input,#toast{
     background:var(--card);-webkit-backdrop-filter:none;backdrop-filter:none}
   body::before{display:none}
 }
-@media (prefers-reduced-motion:reduce){ body::before{animation:none} }
+@media (prefers-reduced-motion:reduce){
+  body::before,.hero::before,.ws-anim,.wallet-row,.seed-word{animation:none}
+  .sheet{transition:transform .2s ease}
+}
 /* старые WebView без backdrop-filter — плотнее фон, чтобы текст читался */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.chip,.qa-ic,#toast{background:var(--card)}
@@ -827,10 +858,38 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 <!-- Мои кошельки -->
 <div id="wallets-sheet" class="sheet">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">Мои кошельки</div>
-  <div class="sheet-note">Выберите активный кошелёк или добавьте новый.</div>
-  <div id="wallets-list"></div>
-  <button class="btn btn-sec" style="margin-top:14px" onclick="addWallet()">+ Добавить кошелёк</button>
+
+  <!-- Список кошельков -->
+  <div id="ws-view-list" class="ws-view">
+    <div class="sheet-title">Мои кошельки</div>
+    <div class="sheet-note">Выберите активный кошелёк или создайте новый.</div>
+    <div id="wallets-list"></div>
+    <div class="row-btns" style="margin-top:16px">
+      <button class="btn" onclick="createWalletInline()">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:4px"><path d="M12 5v14M5 12h14"/></svg>Создать
+      </button>
+      <button class="btn btn-sec" onclick="walletSheetView('import')">Импорт</button>
+    </div>
+  </div>
+
+  <!-- Создание: показ seed-фразы -->
+  <div id="ws-view-seed" class="ws-view" style="display:none">
+    <button class="ws-back" onclick="walletSheetView('list')">‹ Назад</button>
+    <div class="sheet-title">Новый кошелёк</div>
+    <div class="sheet-note">Запишите эту фразу. Это единственный способ восстановить кошелёк — никому её не передавайте.</div>
+    <div id="ws-seed-grid" class="seed-grid"></div>
+    <button class="btn btn-sec btn-sm" onclick="copyInlineSeed()" style="margin-bottom:12px">Скопировать фразу</button>
+    <button class="btn btn-green" onclick="confirmInlineSeed()">Я записал — готово</button>
+  </div>
+
+  <!-- Импорт по seed-фразе -->
+  <div id="ws-view-import" class="ws-view" style="display:none">
+    <button class="ws-back" onclick="walletSheetView('list')">‹ Назад</button>
+    <div class="sheet-title">Импорт кошелька</div>
+    <div class="sheet-note">Вставьте seed-фразу (12 или 24 слова).</div>
+    <textarea id="imp-seed" class="input" rows="3" placeholder="word1 word2 word3 …" style="margin-bottom:12px"></textarea>
+    <button class="btn" id="imp-btn" onclick="submitImport()">Подключить кошелёк</button>
+  </div>
 </div>
 
 <!-- Адреса вручную -->
@@ -1141,11 +1200,11 @@ async function loadWallets() {
     else sw.style.display = "none";
   } catch (_) {}
 }
-function openWalletSheet() {
+function renderWalletList() {
   const el = document.getElementById("wallets-list");
   const check = `<span class="wallet-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>`;
-  el.innerHTML = (state.wallets || []).map(w => `
-    <div class="wallet-row" onclick="switchWallet(${w.index})">
+  el.innerHTML = (state.wallets || []).map((w, i) => `
+    <div class="wallet-row" style="animation-delay:${i * 45}ms" onclick="switchWallet(${w.index})">
       <div class="wallet-av">${(String(w.name).match(/\d+/) || ["●"])[0]}</div>
       <div class="wallet-row-main">
         <div class="wallet-row-name">${w.name}${w.real_mode ? "" : " · тест"}</div>
@@ -1153,6 +1212,20 @@ function openWalletSheet() {
       </div>
       ${w.active ? check : ""}
     </div>`).join("");
+}
+function walletSheetView(view) {
+  ["list", "seed", "import"].forEach(v => {
+    const el = document.getElementById("ws-view-" + v);
+    if (!el) return;
+    if (v === view) {
+      el.style.display = "";
+      el.classList.remove("ws-anim"); void el.offsetWidth; el.classList.add("ws-anim");
+    } else el.style.display = "none";
+  });
+}
+function openWalletSheet() {
+  renderWalletList();
+  walletSheetView("list");
   openSheet("wallets-sheet");
 }
 async function switchWallet(idx) {
@@ -1164,10 +1237,42 @@ async function switchWallet(idx) {
     toast("Кошелёк переключён", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-function addWallet() {
-  closeSheets();
-  document.getElementById("seed-input").value = "";
-  showScreen("connect");
+async function createWalletInline() {
+  try {
+    const d = await api("POST", "/api/wallet/connect", { seed: "generate" });
+    state.newSeed = d.seed;
+    state.wallet = { connected: true, address: d.address, addresses: d.addresses || {},
+                     balances: d.balances, real_mode: false };
+    document.getElementById("ws-seed-grid").innerHTML = d.seed.split(" ").map((w, i) =>
+      `<div class="seed-word" style="animation-delay:${i * 30}ms"><span>${i + 1}</span><b>${w}</b></div>`).join("");
+    walletSheetView("seed");
+  } catch (e) { toast(e.message, "err"); }
+}
+function copyInlineSeed() { if (state.newSeed) copyToClipboard(state.newSeed); }
+async function confirmInlineSeed() {
+  await loadWallets();
+  renderWalletList();
+  walletSheetView("list");
+  showApp();
+  toast("Кошелёк создан", "ok");
+}
+async function submitImport() {
+  const seed = document.getElementById("imp-seed").value.trim();
+  if (!seed) { toast("Введите seed-фразу", "err"); return; }
+  const btn = document.getElementById("imp-btn");
+  btn.disabled = true; btn.textContent = "Подключение…";
+  try {
+    const d = await api("POST", "/api/wallet/connect", { seed });
+    state.wallet = { connected: true, address: d.address, addresses: d.addresses || {},
+                     balances: d.balances, real_mode: d.real_mode || false };
+    document.getElementById("imp-seed").value = "";
+    await loadWallets();
+    renderWalletList();
+    walletSheetView("list");
+    showApp();
+    toast(d.real_mode ? "Кошелёк импортирован" : "Кошелёк подключён", "ok");
+  } catch (e) { toast(e.message, "err"); }
+  finally { btn.disabled = false; btn.textContent = "Подключить кошелёк"; }
 }
 
 // ── Экран актива ──
