@@ -57,32 +57,175 @@ checks: dict[str, dict] = {}
 invoices: dict[str, dict] = {}
 p2p_orders: list[dict] = []
 
-# в”Ђв”Ђ Persistence (JSON-файл, переживает рестарты) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-# На Railway задайте DATA_FILE=/data/wallet_data.json и примонтируйте Volume на /data,
-# иначе файл очищается при каждом редеплое.
-DATA_FILE = os.environ.get("DATA_FILE", "wallet_data.json")
+# в”Ђв”Ђ Persistence (SQLite, переживает рестарты) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# На Railway задайте DB_FILE=/data/wallet.db и примонтируйте Volume на /data,
+# иначе файл очищается при каждом редеплое контейнера.
+#
+# Схема: один пользователь (профиль) = одна строка в users, привязанная к
+# Telegram ID. У пользователя может быть несколько кошельков (мультикошелёк,
+# каждый — отдельная строка в wallets со своей seed-фразой, адресами и
+# балансами). Транзакции и стейки привязаны к конкретному кошельку.
+import sqlite3
+
+DB_FILE = os.environ.get("DB_FILE", "wallet.db")
+_LEGACY_DATA_FILE = os.environ.get("DATA_FILE", "wallet_data.json")  # для миграции со старой версии
+
+
+def _db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    conn = _db()
+    try:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id            INTEGER PRIMARY KEY,   -- Telegram ID пользователя
+                username      TEXT,
+                first_name    TEXT,
+                active_wallet INTEGER NOT NULL DEFAULT 0,
+                created_at    TEXT
+            );
+            CREATE TABLE IF NOT EXISTS wallets (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL,
+                wallet_index  INTEGER NOT NULL,       -- позиция в списке кошельков пользователя
+                name          TEXT,
+                seed          TEXT,                   -- учёт seed-фразы кошелька
+                address       TEXT,
+                addresses     TEXT,                   -- JSON {asset: address}
+                balances      TEXT,                   -- JSON {asset: amount}
+                real_mode     INTEGER NOT NULL DEFAULT 0,
+                created_at    TEXT,
+                UNIQUE(user_id, wallet_index),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS wallet_transactions (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL,
+                wallet_index  INTEGER NOT NULL,
+                tx_id         TEXT,
+                type          TEXT,
+                asset         TEXT,
+                amount        REAL,
+                address       TEXT,
+                comment       TEXT,
+                status        TEXT,
+                ts            TEXT
+            );
+            CREATE TABLE IF NOT EXISTS wallet_stakes (
+                id            TEXT PRIMARY KEY,
+                user_id       INTEGER NOT NULL,
+                wallet_index  INTEGER NOT NULL,
+                asset         TEXT,
+                amount        REAL,
+                apy           REAL,
+                started_at    TEXT,
+                status        TEXT
+            );
+            CREATE TABLE IF NOT EXISTS checks (
+                code TEXT PRIMARY KEY,
+                data TEXT
+            );
+            CREATE TABLE IF NOT EXISTS invoices (
+                id   TEXT PRIMARY KEY,
+                data TEXT
+            );
+            CREATE TABLE IF NOT EXISTS p2p_orders (
+                id   TEXT PRIMARY KEY,
+                data TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
+            CREATE INDEX IF NOT EXISTS idx_tx_user_wallet ON wallet_transactions(user_id, wallet_index);
+            CREATE INDEX IF NOT EXISTS idx_stakes_user_wallet ON wallet_stakes(user_id, wallet_index);
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def save_state() -> None:
-    try:
-        payload = {
-            "users": users,
-            "checks": checks,
-            "invoices": invoices,
-            "p2p_orders": [o for o in p2p_orders if not str(o.get("id", "")).startswith("demo_")],
-        }
-        tmp = DATA_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, default=str)
-        os.replace(tmp, DATA_FILE)
-    except Exception as e:
-        print(f"[PERSIST] save: {e}")
+    """Полная пересинхронизация текущего in-memory состояния в SQLite.
 
-def load_state() -> None:
+    Вызывается после каждого изменяющего запроса (см. _persist_middleware).
+    Состояние в памяти небольшое (одна сессия бота), поэтому полная
+    перезапись таблиц внутри одной транзакции — простой и надёжный способ
+    не городить точечные UPDATE/INSERT на каждый из 30+ эндпоинтов.
+    """
+    conn = None
     try:
-        if not os.path.exists(DATA_FILE):
-            print("[PERSIST] файл состояния не найден — старт с чистого состояния")
-            return
-        with open(DATA_FILE, encoding="utf-8") as f:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute("BEGIN")
+        for tbl in ("users", "wallets", "wallet_transactions", "wallet_stakes",
+                    "checks", "invoices", "p2p_orders"):
+            cur.execute(f"DELETE FROM {tbl}")
+
+        for uid, u in users.items():
+            cur.execute(
+                "INSERT INTO users (id, username, first_name, active_wallet, created_at) "
+                "VALUES (?,?,?,?,?)",
+                (uid, u.get("username", ""), u.get("first_name", "User"),
+                 u.get("active", 0), u.get("created_at") or _now()),
+            )
+            for idx, w in enumerate(u.get("wallets", [])):
+                cur.execute(
+                    "INSERT INTO wallets (user_id, wallet_index, name, seed, address, "
+                    "addresses, balances, real_mode, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (uid, idx, w.get("name") or f"Кошелёк {idx + 1}", w.get("seed"),
+                     w.get("address"),
+                     json.dumps(w.get("addresses", {}), ensure_ascii=False, default=str),
+                     json.dumps(w.get("balances", {}), ensure_ascii=False, default=str),
+                     1 if w.get("real_mode") else 0, w.get("created_at") or _now()),
+                )
+                for tx in w.get("txs", []):
+                    cur.execute(
+                        "INSERT INTO wallet_transactions (user_id, wallet_index, tx_id, type, "
+                        "asset, amount, address, comment, status, ts) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (uid, idx, tx.get("id"), tx.get("type"), tx.get("asset"), tx.get("amount"),
+                         tx.get("address", ""), tx.get("comment", ""),
+                         tx.get("status", "completed"), tx.get("ts")),
+                    )
+                for s in w.get("stakes", []):
+                    cur.execute(
+                        "INSERT INTO wallet_stakes (id, user_id, wallet_index, asset, amount, "
+                        "apy, started_at, status) VALUES (?,?,?,?,?,?,?,?)",
+                        (s.get("id"), uid, idx, s.get("asset"), s.get("amount"), s.get("apy"),
+                         s.get("started_at"), s.get("status")),
+                    )
+
+        for code, c in checks.items():
+            cur.execute("INSERT INTO checks (code, data) VALUES (?,?)",
+                        (code, json.dumps(c, ensure_ascii=False, default=str)))
+        for iid, inv in invoices.items():
+            cur.execute("INSERT INTO invoices (id, data) VALUES (?,?)",
+                        (iid, json.dumps(inv, ensure_ascii=False, default=str)))
+        for o in p2p_orders:
+            if str(o.get("id", "")).startswith("demo_"):
+                continue
+            cur.execute("INSERT INTO p2p_orders (id, data) VALUES (?,?)",
+                        (o.get("id"), json.dumps(o, ensure_ascii=False, default=str)))
+        conn.commit()
+    except Exception as e:
+        print(f"[DB] save: {e}")
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _migrate_legacy_json() -> bool:
+    """Одноразовая миграция со старой версии (JSON-файл) в SQLite, если он есть."""
+    if not os.path.exists(_LEGACY_DATA_FILE):
+        return False
+    try:
+        with open(_LEGACY_DATA_FILE, encoding="utf-8") as f:
             data = json.load(f)
         for k, v in (data.get("users") or {}).items():
             users[int(k)] = v
@@ -92,19 +235,101 @@ def load_state() -> None:
         for o in (data.get("p2p_orders") or []):
             if o.get("id") not in existing:
                 p2p_orders.append(o)
-        # пере-связать transactions с txs активного кошелька
-        for uid, u in users.items():
-            ws = u.get("wallets", [])
-            act = u.get("active", 0)
+        print(f"[DB] миграция из старого {_LEGACY_DATA_FILE}: users={len(users)}")
+        return True
+    except Exception as e:
+        print(f"[DB] миграция из {_LEGACY_DATA_FILE} не удалась: {e}")
+        return False
+
+
+def load_state() -> None:
+    init_db()
+    conn = None
+    try:
+        conn = _db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users")
+        urows = cur.fetchall()
+
+        if not urows:
+            # база пуста — проверяем, нет ли данных со старой (JSON) версии
+            if _migrate_legacy_json():
+                save_state()
+            else:
+                print("[DB] база данных пуста — старт с чистого состояния")
+            return
+
+        for ur in urows:
+            uid = ur["id"]
+            u = {
+                "id": uid,
+                "username": ur["username"] or "",
+                "first_name": ur["first_name"] or "User",
+                "seed": None, "address": None, "addresses": {}, "real_mode": False,
+                "balances": {a: 0.0 for a in ASSETS},
+                "wallets": [], "active": ur["active_wallet"] or 0,
+                "created_at": ur["created_at"],
+            }
+            cur.execute("SELECT * FROM wallets WHERE user_id=? ORDER BY wallet_index", (uid,))
+            for wr in cur.fetchall():
+                idx = wr["wallet_index"]
+                cur.execute(
+                    "SELECT tx_id AS id, type, asset, amount, address, comment, status, ts "
+                    "FROM wallet_transactions WHERE user_id=? AND wallet_index=? ORDER BY id",
+                    (uid, idx),
+                )
+                txs = [dict(row) for row in cur.fetchall()]
+                cur.execute(
+                    "SELECT id, asset, amount, apy, started_at, status "
+                    "FROM wallet_stakes WHERE user_id=? AND wallet_index=?",
+                    (uid, idx),
+                )
+                sks = [dict(row) for row in cur.fetchall()]
+                u["wallets"].append({
+                    "name": wr["name"] or f"Кошелёк {idx + 1}",
+                    "seed": wr["seed"],
+                    "address": wr["address"],
+                    "addresses": json.loads(wr["addresses"] or "{}"),
+                    "balances": json.loads(wr["balances"] or "{}"),
+                    "real_mode": bool(wr["real_mode"]),
+                    "created_at": wr["created_at"],
+                    "txs": txs,
+                    "stakes": sks,
+                })
+            users[uid] = u
+
+            act = u["active"]
+            ws = u["wallets"]
             if ws and 0 <= act < len(ws):
-                transactions[uid] = ws[act].setdefault("txs", [])
-                stakes[uid] = ws[act].setdefault("stakes", [])
+                w = ws[act]
+                u["seed"], u["address"] = w["seed"], w["address"]
+                u["addresses"], u["balances"] = w["addresses"], w["balances"]
+                u["real_mode"] = w["real_mode"]
+                transactions[uid] = w["txs"]
+                stakes[uid] = w["stakes"]
             else:
                 transactions[uid] = []
                 stakes[uid] = []
-        print(f"[PERSIST] загружено: users={len(users)}, checks={len(checks)}, invoices={len(invoices)}")
+
+        cur.execute("SELECT code, data FROM checks")
+        for row in cur.fetchall():
+            checks[row["code"]] = json.loads(row["data"])
+        cur.execute("SELECT id, data FROM invoices")
+        for row in cur.fetchall():
+            invoices[row["id"]] = json.loads(row["data"])
+        cur.execute("SELECT id, data FROM p2p_orders")
+        existing = {o.get("id") for o in p2p_orders}
+        for row in cur.fetchall():
+            d = json.loads(row["data"])
+            if d.get("id") not in existing:
+                p2p_orders.append(d)
+
+        print(f"[DB] загружено: users={len(users)}, checks={len(checks)}, invoices={len(invoices)}")
     except Exception as e:
-        print(f"[PERSIST] load: {e}")
+        print(f"[DB] load: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
 
 ASSETS = ["TON", "USDT", "ETH", "BNB", "BTC", "TRX"]
 TEST_RATES: dict[tuple, float] = {
@@ -444,6 +669,7 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "User
             "balances": {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0, "TRX": 0.0},
             "wallets": [],   # список сохранённых кошельков (мультикошелёк)
             "active": 0,     # индекс активного кошелька
+            "created_at": _now(),
         }
         transactions[user_id] = []
         stakes[user_id] = []
@@ -474,6 +700,7 @@ def _register_active_wallet(user: dict, seed: str) -> None:
         "addresses": user["addresses"],
         "balances": user["balances"],
         "real_mode": user["real_mode"],
+        "created_at": _now(),
         "txs": transactions.get(user["id"], []),
         "stakes": stakes.get(user["id"], []),
     }
