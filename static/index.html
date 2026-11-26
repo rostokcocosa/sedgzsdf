@@ -119,6 +119,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .asset-main{flex:1;min-width:0}
 .asset-name{font-size:16px;font-weight:600}
 .asset-sub{font-size:13px;color:var(--hint)}
+.asset-staked-hint{font-size:11.5px;color:var(--green);margin-top:1px}
 .asset-right{text-align:right}
 .asset-amt{font-size:16px;font-weight:600}
 .asset-fiat{font-size:13px;color:var(--hint)}
@@ -222,6 +223,10 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .as-top .coin{width:64px;height:64px;margin:0 auto 12px}
 .as-amt{font-size:30px;font-weight:800;letter-spacing:-1px}
 .as-fiat{font-size:15px;color:var(--hint);margin-top:2px}
+.as-breakdown{display:flex;justify-content:center;gap:22px;margin-top:10px}
+.as-breakdown div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.as-breakdown span{font-size:11.5px;color:var(--hint)}
+.as-breakdown b{font-size:14px;font-weight:600}
 .as-actions{display:flex;justify-content:center;gap:16px;margin-top:18px}
 
 /* ── misc ── */
@@ -774,6 +779,10 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
     <div class="coin"><img id="as-logo" src="/static/coins/ton.svg" alt=""></div>
     <div class="as-amt" id="as-amt">0</div>
     <div class="as-fiat" id="as-fiat">$0.00</div>
+    <div class="as-breakdown" id="as-breakdown" style="display:none">
+      <div><span>Доступно</span><b id="as-avail">0</b></div>
+      <div><span>В стейке</span><b id="as-staked">0</b></div>
+    </div>
     <div class="as-actions">
       <button class="qa" onclick="openReceive(_assetOpen)">
         <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
@@ -950,8 +959,14 @@ const ADDR_KEY = { TON:"TON", USDT:"TON", ETH:"ETH", BNB:"ETH", BTC:"BTC", TRX:"
 
 const state = {
   wallet: null, newSeed: null, activeTab: "wallet",
-  realMode: false, addresses: {}, wallets: [],
+  realMode: false, addresses: {}, wallets: [], stakes: [],
 };
+
+// Сумма, застейканная по конкретной монете (сумма всех активных стейков).
+function stakedAmount(asset) {
+  return (state.stakes || []).filter(s => s.asset === asset)
+    .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+}
 
 // ── API ──
 async function api(method, path, body = null) {
@@ -1002,7 +1017,7 @@ function showApp() {
   badge.style.display = "inline-block";
   document.getElementById("btn-refresh").style.display = state.realMode ? "inline-flex" : "none";
   if (!initData) document.getElementById("dev-banner-app").style.display = "flex";
-  loadHistory(); loadWallets(); loadProfileHeader();
+  loadHistory(); loadWallets(); loadProfileHeader(); loadStakeTotals();
 }
 
 // ── Connect ──
@@ -1041,12 +1056,18 @@ function copySeed() { if (state.newSeed) copyToClipboard(state.newSeed); }
 function confirmNewSeed() { showApp(); toast("Кошелёк создан", "ok"); }
 
 // ── Balances / assets ──
+// Общий баланс и суммы по монетам считаем как «доступно + в стейке» —
+// застейканные средства никуда не пропадают, это тестовая симуляция
+// без реальной блокировки, просто временно отложенная часть портфеля.
 function updateBalances(bal) {
   if (!bal) return;
   if (state.wallet) state.wallet.balances = bal;
   renderAssets(bal);
   let total = 0;
-  for (const a of ASSET_LIST) total += Number(bal[a] || 0) * (RATES[a] || 0);
+  for (const a of ASSET_LIST) {
+    const amt = Number(bal[a] || 0) + stakedAmount(a);
+    total += amt * (RATES[a] || 0);
+  }
   document.getElementById("hero-total").textContent = fmtUsd(total);
   if (_assetOpen) renderAssetDetail(_assetOpen);
 }
@@ -1054,10 +1075,13 @@ function updateBalances(bal) {
 function renderAssets(bal) {
   const el = document.getElementById("assets-list");
   el.innerHTML = ASSET_LIST.map(a => {
-    const amt = Number(bal[a] || 0), usd = amt * (RATES[a] || 0), m = COIN_META[a];
+    const avail = Number(bal[a] || 0), staked = stakedAmount(a), amt = avail + staked;
+    const usd = amt * (RATES[a] || 0), m = COIN_META[a];
+    const stakedHint = staked > 0
+      ? `<div class="asset-staked-hint">в стейке: ${fmtAmt(staked, a)}</div>` : "";
     return `<div class="asset" onclick="openAsset('${a}')">
       <div class="coin"><img src="/static/coins/${m.img}" alt="${a}"></div>
-      <div class="asset-main"><div class="asset-name">${m.name}</div><div class="asset-sub">${a}</div></div>
+      <div class="asset-main"><div class="asset-name">${m.name}</div><div class="asset-sub">${a}</div>${stakedHint}</div>
       <div class="asset-right"><div class="asset-amt">${fmtAmt(amt,a)}</div><div class="asset-fiat">${fmtUsd(usd)}</div></div>
       <div class="asset-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
     </div>`;
@@ -1128,14 +1152,23 @@ function closeSheets() {
 
 // ── Стейкинг ──
 let _stakeApy = {}, _stakePoll = null;
-async function loadStaking() {
+// Лёгкий фоновый рефреш застейканных сумм — обновляет общий баланс и
+// разбивку «доступно/в стейке», даже когда вкладка «Стейк» не открыта.
+async function loadStakeTotals() {
   try {
     const d = await api("GET", "/api/staking");
     _stakeApy = d.apy || {};
-    selectChip("stk", _coin.stk);
-    renderStakes(d.stakes || []);
-    startStakingPoll();
-  } catch (_) {}
+    state.stakes = d.stakes || [];
+    if (state.wallet?.balances) updateBalances(state.wallet.balances);
+    return d;
+  } catch (_) { return null; }
+}
+async function loadStaking() {
+  const d = await loadStakeTotals();
+  if (!d) return;
+  selectChip("stk", _coin.stk);
+  renderStakes(d.stakes || []);
+  startStakingPoll();
 }
 function startStakingPoll() {
   stopStakingPoll();
@@ -1480,11 +1513,22 @@ function closeAsset() {
   _assetOpen = null;
 }
 function renderAssetDetail(asset) {
-  const m = COIN_META[asset], bal = Number(state.wallet?.balances?.[asset] || 0);
+  const m = COIN_META[asset];
+  const avail = Number(state.wallet?.balances?.[asset] || 0);
+  const staked = stakedAmount(asset);
+  const total = avail + staked;
   document.getElementById("as-head-title").textContent = m.name;
   document.getElementById("as-logo").src = `/static/coins/${m.img}`;
-  document.getElementById("as-amt").textContent = `${fmtAmt(bal, asset)} ${asset}`;
-  document.getElementById("as-fiat").textContent = fmtUsd(bal * (RATES[asset] || 0));
+  document.getElementById("as-amt").textContent = `${fmtAmt(total, asset)} ${asset}`;
+  document.getElementById("as-fiat").textContent = fmtUsd(total * (RATES[asset] || 0));
+  const bd = document.getElementById("as-breakdown");
+  if (staked > 0) {
+    document.getElementById("as-avail").textContent = fmtAmt(avail, asset);
+    document.getElementById("as-staked").textContent = fmtAmt(staked, asset);
+    bd.style.display = "flex";
+  } else {
+    bd.style.display = "none";
+  }
 }
 async function loadAssetHistory(asset) {
   const el = document.getElementById("as-tx");
