@@ -280,6 +280,196 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wallet-check{color:var(--accent);flex-shrink:0}
 .wallet-check svg{width:22px;height:22px}
+
+/* ═════════════ Liquid Glass (iOS 26) ═════════════ */
+:root{
+  --g-fill:   rgba(255,255,255,.52);
+  --g-fill-2: rgba(255,255,255,.34);
+  --g-edge:   rgba(255,255,255,.75);
+  --g-edge-2: rgba(255,255,255,.18);
+  --g-shadow: 0 10px 30px rgba(20,30,60,.10), 0 1px 2px rgba(20,30,60,.06);
+  --g-blur:   saturate(185%) blur(26px);
+  --g-tint:   color-mix(in srgb, var(--accent) 16%, transparent);
+  --g-bar:    rgba(250,251,253,.86);
+  --page-glass:#e9eef6;
+  --blob-1: color-mix(in srgb, var(--accent) 55%, #7dd3fc);
+  --blob-2: #c4b5fd;
+  --blob-3: #fbcfe8;
+  --radius:24px; --radius-sm:18px;
+}
+html[data-scheme="dark"]{
+  --page:#07090d; --card:#141820; --text:#f4f6f8; --hint:#8e97a3;
+  --border:rgba(255,255,255,.08);
+  --g-fill:   rgba(40,46,58,.42);
+  --g-fill-2: rgba(40,46,58,.28);
+  --g-edge:   rgba(255,255,255,.22);
+  --g-edge-2: rgba(255,255,255,.04);
+  --g-shadow: 0 12px 34px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+  --g-bar:    rgba(26,30,38,.86);
+  --page-glass:#07090d;
+  --blob-1: color-mix(in srgb, var(--accent) 70%, #1e3a8a);
+  --blob-2: #4c1d95;
+  --blob-3: #0f766e;
+}
+@media (prefers-color-scheme:dark){
+  html:not([data-scheme="light"]){
+    --g-fill:rgba(40,46,58,.42); --g-fill-2:rgba(40,46,58,.28);
+    --g-edge:rgba(255,255,255,.22); --g-edge-2:rgba(255,255,255,.04);
+    --g-shadow:0 12px 34px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.3);
+    --g-bar:rgba(26,30,38,.86); --page-glass:#07090d;
+    --blob-1:color-mix(in srgb, var(--accent) 70%, #1e3a8a); --blob-2:#4c1d95; --blob-3:#0f766e;
+  }
+}
+html[data-scheme="light"]{
+  --page:#eef1f4; --card:#ffffff; --text:#0d1620; --hint:#6e7681;
+  --border:rgba(13,22,32,.08);
+}
+
+/* живой фон: под стеклом должно быть что преломлять */
+body{background:var(--page-glass)}
+body::before{
+  content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(38% 30% at 18% 12%, var(--blob-1) 0%, transparent 70%),
+    radial-gradient(34% 28% at 88% 30%, var(--blob-2) 0%, transparent 72%),
+    radial-gradient(40% 32% at 30% 78%, var(--blob-3) 0%, transparent 70%),
+    radial-gradient(30% 26% at 85% 92%, var(--blob-1) 0%, transparent 72%);
+  filter:blur(30px) saturate(120%);opacity:.75;
+  animation:drift 28s ease-in-out infinite alternate;
+}
+@keyframes drift{
+  0%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(3%,-2%,0) scale(1.05)}
+  100%{transform:translate3d(-3%,2%,0) scale(1.02)}
+}
+
+/* базовый материал стекла */
+.card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.seed-word,.chip,
+.qa-ic,.max-btn,.btn-sec,.swap-arrow,#toast,.input,.addr-value,.rate-info,.result-box,.seed-box{
+  background:var(--g-fill);
+  -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
+  border:none;
+  box-shadow:
+    inset 0 1px 0 var(--g-edge),          /* блик сверху */
+    inset 0 -1px 0 var(--g-edge-2),       /* мягкий нижний край */
+    inset 0 0 0 1px var(--g-edge-2),      /* тонкая кромка */
+    var(--g-shadow);
+}
+/* «линза»: блик-градиент по кромке */
+.card,.hero,.wallet-switch,.order-card{position:relative;isolation:isolate}
+.sheet,.bottom-nav{isolation:isolate}
+.card::after,.hero::after,.sheet::after,.bottom-nav::after,.wallet-switch::after,.order-card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;
+  padding:1px;
+  background:linear-gradient(150deg, var(--g-edge) 0%, transparent 32%, transparent 68%, var(--g-edge-2) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+.card::before,.hero::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;
+  background:radial-gradient(120% 60% at 20% -10%, rgba(255,255,255,.35), transparent 55%);
+  opacity:.55;
+}
+html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{opacity:.18}
+
+.card,.hero{border-radius:var(--radius)}
+.hero{padding:26px 18px 20px}
+.hero-total{font-size:44px;letter-spacing:-1.8px}
+
+/* быстрые действия — стеклянные кнопки-капли */
+.qa-ic{background:var(--g-fill);color:var(--accent);width:58px;height:58px}
+.qa:active .qa-ic{transform:scale(.9);background:var(--g-tint)}
+.qa-ic{transition:transform .25s cubic-bezier(.3,1.6,.5,1),background .2s}
+
+/* кнопки */
+.btn{border-radius:999px;position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.12),
+             0 8px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition:transform .25s cubic-bezier(.3,1.6,.5,1),filter .15s}
+.btn::before{content:"";position:absolute;inset:0 0 50% 0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,0))}
+.btn:active{transform:scale(.95)}
+.btn-sec{color:var(--accent)}
+.btn-sec::before,.btn-ghost::before{display:none}
+.btn-ghost{background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.btn-danger{box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 8px 20px rgba(229,72,77,.3)}
+.btn-green{box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 8px 20px rgba(47,177,113,.3)}
+.btn-sm{border-radius:999px}
+.max-btn{border-radius:999px;color:var(--accent)}
+
+/* поля ввода */
+.input{background:var(--g-fill-2);border-radius:16px;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.06), inset 0 0 0 1px var(--g-edge-2)}
+.input:focus{background:var(--g-fill);
+  box-shadow:inset 0 0 0 1.5px var(--accent), 0 0 0 4px var(--g-tint)}
+.addr-value,.rate-info,.result-box,.seed-box{background:var(--g-fill-2)}
+
+/* плавающая таб-панель-капсула */
+.bottom-nav{
+  left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));
+  border-radius:999px;padding:6px;border-top:none;gap:2px;
+  background:var(--g-bar);
+  -webkit-backdrop-filter:saturate(200%) blur(30px);backdrop-filter:saturate(200%) blur(30px);
+}
+.nav-item{border-radius:999px;padding:7px 2px 6px;position:relative;
+  transition:color .2s, background .3s cubic-bezier(.3,1.4,.5,1), transform .25s cubic-bezier(.3,1.6,.5,1)}
+.nav-item.active{
+  background:var(--g-tint);
+  box-shadow:inset 0 1px 0 var(--g-edge), inset 0 0 0 1px var(--g-edge-2);
+}
+.nav-item svg{width:23px;height:23px}
+.page{padding-bottom:calc(104px + env(safe-area-inset-bottom))}
+
+/* список активов */
+.asset{border-bottom-color:var(--border)}
+.coin{background:var(--g-fill-2);box-shadow:inset 0 0 0 1px var(--g-edge-2), 0 2px 6px rgba(0,0,0,.08)}
+
+/* переключатель кошелька */
+.wallet-switch{border-radius:999px}
+
+/* чипы монет */
+.chip{border-radius:999px;border:none}
+.chip.active{background:var(--g-tint);
+  box-shadow:inset 0 1px 0 var(--g-edge), inset 0 0 0 1.5px var(--accent)}
+
+/* нижний лист — парящее стекло */
+.sheet{left:8px;right:8px;bottom:8px;border-radius:34px;
+  padding-bottom:calc(22px + env(safe-area-inset-bottom));
+  background:var(--g-fill);
+  -webkit-backdrop-filter:saturate(190%) blur(34px);backdrop-filter:saturate(190%) blur(34px)}
+.sheet-handle{background:var(--hint);opacity:.35;width:40px;height:5px;border-radius:3px}
+.sheet-backdrop{background:rgba(0,0,0,.22);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+
+/* экран актива */
+.asset-screen{background:transparent}
+.asset-screen.open{-webkit-backdrop-filter:blur(40px) saturate(160%);backdrop-filter:blur(40px) saturate(160%);
+  background:color-mix(in srgb, var(--page-glass) 55%, transparent)}
+.as-head{margin:8px 10px 0;border-radius:999px;padding:8px 10px;top:8px}
+.as-top .coin{width:72px;height:72px}
+
+/* мелочи */
+.swap-arrow{border:none;color:var(--accent)}
+.seed-word{border-radius:14px}
+.order-card{border-radius:var(--radius-sm)}
+.connect-logo{border-radius:28px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -2px 6px rgba(0,0,0,.15),
+             0 14px 30px color-mix(in srgb, var(--accent) 40%, transparent)}
+#toast{color:var(--text);border-radius:999px;bottom:calc(92px + env(safe-area-inset-bottom))}
+#toast.ok{background:color-mix(in srgb, var(--green) 80%, transparent);color:#fff}
+#toast.err{background:color-mix(in srgb, var(--red) 80%, transparent);color:#fff}
+.badge{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+
+/* доступность: без прозрачности и анимаций, если пользователь так настроил */
+@media (prefers-reduced-transparency:reduce){
+  .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.chip,.qa-ic,.input,#toast{
+    background:var(--card);-webkit-backdrop-filter:none;backdrop-filter:none}
+  body::before{display:none}
+}
+@media (prefers-reduced-motion:reduce){ body::before{animation:none} }
+/* старые WebView без backdrop-filter — плотнее фон, чтобы текст читался */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.chip,.qa-ic,#toast{background:var(--card)}
+}
 </style>
 </head>
 <body>
@@ -659,6 +849,10 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 <script>
 "use strict";
 const tg = window.Telegram?.WebApp;
+// Liquid Glass: тема берётся из Telegram (светлая/тёмная), а не только из ОС
+function applyScheme(){ if (tg?.colorScheme) document.documentElement.dataset.scheme = tg.colorScheme; }
+applyScheme(); tg?.onEvent?.("themeChanged", applyScheme);
+try { tg?.setHeaderColor?.("secondary_bg_color"); } catch (_) {}
 const initData = tg?.initData || "";
 const BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
 
