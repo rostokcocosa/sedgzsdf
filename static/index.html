@@ -6,167 +6,222 @@
 <title>DeFi Wallet</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root {
-  --bg:      var(--tg-theme-bg-color,            #18191c);
-  --bg2:     var(--tg-theme-secondary-bg-color,   #232527);
-  --text:    var(--tg-theme-text-color,           #f0f0f0);
-  --hint:    var(--tg-theme-hint-color,           #8e9199);
-  --btn:     var(--tg-theme-button-color,         #2b6be6);
-  --btnT:    var(--tg-theme-button-text-color,    #ffffff);
-  --danger:  var(--tg-theme-destructive-text-color,#e05151);
-  --green:   #3ec97a;
-  --yellow:  #f0a500;
-  --radius:  12px;
+:root{
+  --accent:      var(--tg-theme-button-color,        #2990ff);
+  --accent-text: var(--tg-theme-button-text-color,   #ffffff);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --page:        var(--tg-theme-secondary-bg-color,  #eef1f4);
+  --card:        var(--tg-theme-bg-color,            #ffffff);
+  --text:        var(--tg-theme-text-color,          #0d1620);
+  --hint:        var(--tg-theme-hint-color,          #8a9098);
+  --link:        var(--tg-theme-link-color,          #2990ff);
+  --border:      color-mix(in srgb, var(--text) 9%, transparent);
+  --green:#2fb171; --green-soft:rgba(47,177,113,.14);
+  --red:#e5484d;   --red-soft:rgba(229,72,77,.14);
+  --yellow:#f3a81b;--yellow-soft:rgba(243,168,27,.16);
+  --radius:18px; --radius-sm:13px;
+  --coin-TON:#0098ea; --coin-USDT:#26a17b; --coin-ETH:#627eea; --coin-BNB:#f3ba2f; --coin-BTC:#f7931a;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --page:#0f1317; --card:#1b2026; --text:#f4f6f8; --hint:#8a929c;
+    --border:rgba(255,255,255,.08);
+  }
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:var(--bg);color:var(--text);font-size:15px;line-height:1.4;
-  min-height:100vh;overflow-x:hidden}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+  background:var(--page);color:var(--text);font-size:15px;line-height:1.45;
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;
+}
 
 /* ── layout ── */
 .screen{display:none;min-height:100vh}
-.screen.active{display:block}
-.page{padding:16px 16px 80px}
-.scroll{overflow-y:auto;max-height:calc(100vh - 56px - 80px)}
+.screen.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page{padding:12px 14px calc(84px + env(safe-area-inset-bottom))}
+.tab-content{animation:fade .2s ease}
 
 /* ── cards ── */
-.card{background:var(--bg2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
-.card h3{font-size:14px;font-weight:600;color:var(--hint);text-transform:uppercase;
-  letter-spacing:.5px;margin-bottom:12px}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card h3{font-size:13px;font-weight:600;color:var(--hint);text-transform:uppercase;
+  letter-spacing:.4px;margin-bottom:12px}
+.sec-title{font-size:14px;font-weight:600;color:var(--hint);margin:18px 2px 10px}
 
 /* ── buttons ── */
-.btn{display:block;width:100%;background:var(--btn);color:var(--btnT);border:none;
-  border-radius:10px;padding:13px 16px;font-size:16px;font-weight:600;cursor:pointer;
-  text-align:center;transition:opacity .15s}
-.btn:active{opacity:.75}
-.btn:disabled{opacity:.4;cursor:default}
-.btn-sm{padding:8px 14px;font-size:14px;width:auto;display:inline-block;border-radius:8px}
-.btn-sec{background:var(--bg2);color:var(--text);border:1px solid rgba(255,255,255,.12)}
-.btn-danger{background:var(--danger)}
+.btn{display:block;width:100%;background:var(--accent);color:var(--accent-text);border:none;
+  border-radius:14px;padding:14px 16px;font-size:16px;font-weight:600;cursor:pointer;
+  text-align:center;transition:transform .12s ease,opacity .15s,filter .15s;font-family:inherit;letter-spacing:-.01em}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn-sm{padding:9px 16px;font-size:14px;width:auto;display:inline-block;border-radius:11px}
+.btn-sec{background:var(--accent-soft);color:var(--accent)}
+.btn-danger{background:var(--red);color:#fff}
 .btn-green{background:var(--green);color:#fff}
-.row-btns{display:flex;gap:8px;margin-top:8px}
+.btn-ghost{background:transparent;color:var(--accent);box-shadow:none}
+.row-btns{display:flex;gap:10px;margin-top:10px}
 .row-btns .btn{flex:1}
 
 /* ── inputs ── */
-.input{background:var(--bg);color:var(--text);border:1.5px solid transparent;
-  border-radius:10px;padding:12px;font-size:15px;width:100%;outline:none;
-  transition:border-color .2s}
-.input:focus{border-color:var(--btn)}
+.input{background:var(--page);color:var(--text);border:1.5px solid transparent;
+  border-radius:12px;padding:13px 14px;font-size:16px;width:100%;outline:none;font-family:inherit;
+  transition:border-color .2s,background .2s}
+.input:focus{border-color:var(--accent);background:var(--card)}
 .input::placeholder{color:var(--hint)}
-select.input{cursor:pointer;appearance:none;background-image:
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%238e9199' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
-.field{margin-bottom:10px}
-.field label{display:block;font-size:12px;color:var(--hint);margin-bottom:5px;font-weight:500}
-textarea.input{resize:vertical;min-height:70px}
+select.input{cursor:pointer;appearance:none;padding-right:38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%238a9098' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12.5px;color:var(--hint);margin-bottom:6px;font-weight:500}
+textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 
 /* ── bottom nav ── */
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);
-  display:flex;border-top:1px solid rgba(255,255,255,.08);z-index:100;
-  padding-bottom:env(safe-area-inset-bottom)}
-.nav-item{flex:1;padding:9px 4px 7px;display:flex;flex-direction:column;
-  align-items:center;cursor:pointer;color:var(--hint);font-size:10px;
-  font-weight:500;gap:2px;transition:color .15s}
-.nav-item.active{color:var(--btn)}
-.nav-icon{font-size:22px;line-height:1}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;
+  background:color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  display:flex;border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom)}
+.nav-item{flex:1;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;
+  cursor:pointer;color:var(--hint);font-size:10.5px;font-weight:500;gap:3px;transition:color .15s}
+.nav-item.active{color:var(--accent)}
+.nav-item svg{width:25px;height:25px;display:block}
+.nav-item:active{transform:scale(.9)}
 
-/* ── header ── */
-.wallet-header{background:linear-gradient(135deg,var(--btn) 0%,#1a4cbf 100%);
-  border-radius:var(--radius);padding:20px;margin-bottom:12px;position:relative}
-.wallet-addr{font-family:monospace;font-size:12px;color:rgba(255,255,255,.75);
-  word-break:break-all;margin-bottom:4px}
-.wallet-copy{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);
-  border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+/* ── hero / total balance ── */
+.hero{background:var(--card);border-radius:var(--radius);padding:22px 18px 16px;margin-bottom:12px;
+  text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.hero-label{font-size:13px;color:var(--hint);font-weight:500;margin-bottom:6px}
+.hero-total{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1.05}
+.hero-sub{margin-top:8px;min-height:20px}
+#mode-badge{font-size:11.5px;padding:3px 10px;border-radius:20px;background:var(--accent-soft);
+  color:var(--accent);font-weight:600;display:none}
+.qa-row{display:flex;justify-content:center;gap:10px;margin-top:20px}
+.qa{flex:1;max-width:84px;background:none;border:none;cursor:pointer;color:var(--text);
+  display:flex;flex-direction:column;align-items:center;gap:7px;font-family:inherit;
+  font-size:12px;font-weight:500;transition:transform .12s}
+.qa:active{transform:scale(.93)}
+.qa-ic{width:52px;height:52px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center}
+.qa-ic svg{width:23px;height:23px}
 
-/* ── balance grid ── */
-.bal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.bal-item{background:var(--bg2);border-radius:var(--radius);padding:12px 10px;text-align:center}
-.bal-icon{font-size:22px}
-.bal-name{font-size:11px;color:var(--hint);margin:2px 0}
-.bal-val{font-size:14px;font-weight:700}
+/* ── asset list ── */
+.assets{padding:6px 16px}
+.asset{display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:1px solid var(--border)}
+.asset:last-child{border-bottom:none}
+.coin{width:42px;height:42px;border-radius:50%;flex-shrink:0;overflow:hidden;background:var(--page)}
+.coin img{width:100%;height:100%;display:block;object-fit:cover}
+.asset-main{flex:1;min-width:0}
+.asset-name{font-size:16px;font-weight:600}
+.asset-sub{font-size:13px;color:var(--hint)}
+.asset-right{text-align:right}
+.asset-amt{font-size:16px;font-weight:600}
+.asset-fiat{font-size:13px;color:var(--hint)}
+
+/* ── address card ── */
+.addr-block{margin-top:10px}
+.addr-block:first-child{margin-top:0}
+.addr-label{font-size:12px;color:var(--hint);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.addr-value{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;word-break:break-all;
+  background:var(--page);border-radius:10px;padding:10px 12px;position:relative}
+.addr-copy{background:var(--accent-soft);border:none;color:var(--accent);padding:5px 12px;
+  border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:7px;font-family:inherit}
+.addr-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.addr-tools .btn-sm{flex:1;min-width:auto}
 
 /* ── history ── */
-.tx-list{display:flex;flex-direction:column;gap:1px}
-.tx-item{display:flex;align-items:center;gap:10px;padding:10px 0;
-  border-bottom:1px solid rgba(255,255,255,.05)}
+.tx-list{display:flex;flex-direction:column}
+.tx-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
 .tx-item:last-child{border-bottom:none}
-.tx-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+.tx-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:17px;flex-shrink:0}
-.tx-icon.in {background:rgba(62,201,122,.15)}
-.tx-icon.out{background:rgba(224,81,81,.15)}
-.tx-icon.swap{background:rgba(240,165,0,.15)}
+.tx-icon svg{width:18px;height:18px}
+.tx-icon.in {background:var(--green-soft);color:var(--green)}
+.tx-icon.out{background:var(--red-soft);color:var(--red)}
+.tx-icon.swap{background:var(--yellow-soft);color:var(--yellow)}
 .tx-info{flex:1;min-width:0}
-.tx-label{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tx-sub  {font-size:12px;color:var(--hint)}
-.tx-amt{text-align:right;font-weight:600;font-size:14px}
+.tx-label{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-sub{font-size:12.5px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-amt{text-align:right;font-weight:600;font-size:15px;white-space:nowrap}
 .tx-amt.in {color:var(--green)}
-.tx-amt.out{color:var(--danger)}
+.tx-amt.out{color:var(--red)}
+.empty{color:var(--hint);font-size:14px;text-align:center;padding:22px 10px}
 
 /* ── badges ── */
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
-.badge-buy {background:rgba(62,201,122,.2);color:var(--green)}
-.badge-sell{background:rgba(224,81,81,.2); color:var(--danger)}
-.badge-pending{background:rgba(240,165,0,.2);color:var(--yellow)}
-.badge-paid   {background:rgba(62,201,122,.2);color:var(--green)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+.badge-buy {background:var(--green-soft);color:var(--green)}
+.badge-sell{background:var(--red-soft); color:var(--red)}
+.badge-pending{background:var(--yellow-soft);color:var(--yellow)}
+.badge-paid   {background:var(--green-soft);color:var(--green)}
 
-/* ── seed display ── */
-.seed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
-.seed-word{background:var(--bg2);border-radius:8px;padding:8px 6px;text-align:center}
-.seed-word span{font-size:10px;color:var(--hint);display:block}
-.seed-word b{font-size:14px}
-.seed-box{background:var(--bg2);border-radius:var(--radius);padding:14px;
-  font-family:monospace;font-size:14px;word-break:break-all;line-height:1.6;
-  margin:8px 0;color:var(--text)}
+/* ── seed ── */
+.seed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.seed-word{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 6px;
+  text-align:center;display:flex;align-items:baseline;justify-content:center;gap:5px}
+.seed-word span{font-size:11px;color:var(--hint)}
+.seed-word b{font-size:14px;font-weight:600}
+.seed-box{background:var(--card);border-radius:var(--radius-sm);padding:14px;
+  font-family:ui-monospace,monospace;font-size:14px;word-break:break-word;line-height:1.7;margin:8px 0}
 
-/* ── connect screen ── */
+/* ── connect / onboarding ── */
 .connect-wrap{display:flex;flex-direction:column;align-items:center;
-  justify-content:flex-start;padding:40px 20px 20px;min-height:100vh}
-.connect-logo{font-size:64px;margin-bottom:16px}
-.connect-title{font-size:24px;font-weight:700;margin-bottom:8px}
-.connect-hint{color:var(--hint);text-align:center;margin-bottom:28px;font-size:14px}
-.connect-wrap .card{width:100%;max-width:400px}
-.divider{text-align:center;color:var(--hint);margin:12px 0;font-size:13px}
+  padding:52px 18px calc(40px + env(safe-area-inset-bottom));min-height:100vh}
+.connect-logo{width:84px;height:84px;border-radius:24px;display:flex;align-items:center;
+  justify-content:center;font-size:44px;margin-bottom:18px;
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#8b5cf6));
+  box-shadow:0 10px 30px var(--accent-soft)}
+.connect-title{font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
+.connect-hint{color:var(--hint);text-align:center;margin-bottom:26px;font-size:14.5px;max-width:300px}
+.connect-wrap .card{width:100%;max-width:420px}
+.divider{display:flex;align-items:center;gap:12px;color:var(--hint);margin:14px 0;font-size:13px;
+  width:100%;max-width:420px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
 
-/* ── QR modal ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
-  display:none;align-items:center;justify-content:center}
-.modal-overlay.open{display:flex}
-.modal-box{background:var(--bg2);border-radius:16px;padding:24px;width:280px;text-align:center}
-.modal-box h3{margin-bottom:16px;font-size:16px}
-.modal-box img{border-radius:8px;background:#fff;padding:8px;width:200px;height:200px}
-.modal-addr{font-family:monospace;font-size:11px;color:var(--hint);
-  word-break:break-all;margin:10px 0}
-.modal-close{margin-top:14px}
+/* ── modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;
+  display:none;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex;animation:fade .2s ease}
+.modal-box{background:var(--card);border-radius:22px;padding:24px;width:100%;max-width:300px;text-align:center}
+.modal-box h3{margin-bottom:16px;font-size:16px;font-weight:600}
+.modal-box img{border-radius:14px;background:#fff;padding:10px;width:208px;height:208px;margin:0 auto}
+.modal-addr{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--hint);
+  word-break:break-all;margin:12px 0}
 
-/* ── P2P order card ── */
-.order-card{background:var(--bg2);border-radius:var(--radius);padding:14px;margin-bottom:8px}
+/* ── misc ── */
+.order-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:14px;margin-bottom:10px}
 .order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.order-info{font-size:13px;color:var(--hint);margin-bottom:6px}
-.order-price{font-size:16px;font-weight:700}
-
-/* ── swap widget ── */
-.swap-wrap{position:relative}
-.swap-arrow{text-align:center;font-size:22px;padding:4px;cursor:pointer;user-select:none}
-.rate-info{background:var(--bg);border-radius:8px;padding:10px 12px;
-  font-size:13px;color:var(--hint);margin-top:6px;text-align:center}
-
-/* ── result box ── */
-.result-box{background:var(--bg);border-radius:var(--radius);padding:14px;
-  font-size:14px;margin:10px 0;word-break:break-all}
-.result-box code{font-family:monospace;color:var(--btn);font-size:15px}
+.order-info{font-size:13.5px;color:var(--hint);margin-bottom:8px}
+.order-price{font-size:17px;font-weight:700}
+.swap-arrow{display:flex;align-items:center;justify-content:center;width:40px;height:40px;margin:-6px auto;
+  border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:20px;cursor:pointer;
+  border:3px solid var(--card);position:relative;z-index:2;user-select:none}
+.rate-info{background:var(--page);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--hint);
+  margin-top:10px;text-align:center}
+.rate-table{display:flex;flex-direction:column}
+.rate-table>div{display:flex;justify-content:space-between;align-items:center;padding:10px 0;
+  border-bottom:1px solid var(--border);font-size:14px}
+.rate-table>div:last-child{border-bottom:none}
+.rate-table span{color:var(--hint)}
+.rate-table b{font-weight:600}
+.result-box{background:var(--page);border-radius:var(--radius-sm);padding:14px;font-size:14px;
+  margin-top:12px;word-break:break-all}
+.result-box code{font-family:ui-monospace,monospace;color:var(--accent);font-size:15px;font-weight:600}
+.hint-text{font-size:12.5px;color:var(--hint);margin-bottom:10px;line-height:1.5}
 
 /* ── toast ── */
-#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
-  background:rgba(0,0,0,.85);color:#fff;padding:10px 18px;border-radius:20px;
-  font-size:14px;opacity:0;transition:all .3s;z-index:300;white-space:nowrap;
-  pointer-events:none;max-width:90vw;text-align:center}
+#toast{position:fixed;bottom:calc(86px + env(safe-area-inset-bottom));left:50%;
+  transform:translateX(-50%) translateY(16px);background:#1c1f24;color:#fff;padding:11px 20px;
+  border-radius:22px;font-size:14px;opacity:0;transition:all .3s cubic-bezier(.2,.9,.3,1);z-index:300;
+  white-space:nowrap;pointer-events:none;max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#toast.ok  {background:#2a7a4b}
-#toast.err {background:#8b2a2a}
+#toast.ok {background:var(--green)}
+#toast.err{background:var(--red)}
 
 /* ── dev banner ── */
-#dev-banner{background:#2c2200;border:1px solid #6b4a00;border-radius:8px;
-  padding:10px 14px;font-size:12px;color:#f0a500;margin-bottom:12px;text-align:center}
+#dev-banner,#dev-banner-app{background:var(--yellow-soft);border-radius:12px;
+  padding:11px 14px;font-size:12.5px;color:var(--yellow);margin-bottom:14px;text-align:center;font-weight:500}
 </style>
 </head>
 <body>
@@ -174,15 +229,15 @@ textarea.input{resize:vertical;min-height:70px}
 <!-- ══ Экран подключения ══ -->
 <div id="screen-connect" class="screen">
 <div class="connect-wrap">
-  <div class="connect-logo">💎</div>
+  <div class="connect-logo"><svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M14 9h20l6 9-16 21L8 18z"/><path d="M8 18h32M19 9l5 30M29 9l-5 30"/></svg></div>
   <div class="connect-title">DeFi Wallet</div>
-  <div class="connect-hint">Подключите или создайте тестовый кошелёк</div>
+  <div class="connect-hint">Подключите существующий кошелёк или создайте новый за секунду</div>
 
-  <div id="dev-banner" style="display:none">
-    ⚠️ Браузерный режим — initData не передаётся. Установите <b>DEV_MODE=true</b> для тестирования.
+  <div id="dev-banner" style="display:none;max-width:420px;width:100%">
+    Браузерный режим — <b>initData</b> не передаётся. Для теста задайте <b>DEV_MODE=true</b>.
   </div>
 
-  <div class="card" style="max-width:420px;width:100%">
+  <div class="card">
     <h3>Существующий кошелёк</h3>
     <div class="field">
       <label>Seed-фраза (12 или 24 слова)</label>
@@ -191,10 +246,10 @@ textarea.input{resize:vertical;min-height:70px}
     <button class="btn" id="btn-connect" onclick="connectSeed()">Подключить</button>
   </div>
 
-  <div class="divider">— или —</div>
+  <div class="divider">или</div>
 
   <button class="btn btn-sec" style="max-width:420px;width:100%" onclick="requestGenerate()">
-    ✨ Создать новый кошелёк
+    Создать новый кошелёк
   </button>
 </div>
 </div>
@@ -202,18 +257,20 @@ textarea.input{resize:vertical;min-height:70px}
 <!-- ══ Экран новой seed-фразы ══ -->
 <div id="screen-newseed" class="screen">
 <div class="page">
-  <div style="text-align:center;padding:16px 0 10px">
-    <div style="font-size:40px">⚠️</div>
-    <div style="font-size:18px;font-weight:700;margin:8px 0">Запишите seed-фразу</div>
-    <div style="color:var(--hint);font-size:14px">Это единственный способ восстановить кошелёк.<br>Никогда не передавайте её никому.</div>
+  <div style="text-align:center;padding:18px 0 8px">
+    <div style="color:var(--accent)"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+    <div style="font-size:20px;font-weight:700;margin:10px 0 6px">Запишите seed-фразу</div>
+    <div style="color:var(--hint);font-size:14px;max-width:300px;margin:0 auto">
+      Это единственный способ восстановить кошелёк. Никогда никому её не передавайте.
+    </div>
   </div>
   <div id="seed-words-grid" class="seed-grid"></div>
   <div class="card">
     <h3>Полная фраза</h3>
     <div id="seed-full" class="seed-box"></div>
-    <button class="btn btn-sm btn-sec" onclick="copySeed()" style="margin-top:4px">📋 Скопировать</button>
+    <button class="btn btn-sec btn-sm" onclick="copySeed()" style="margin-top:6px">Скопировать</button>
   </div>
-  <button class="btn btn-green" onclick="confirmNewSeed()">✅ Я сохранил(а) — продолжить</button>
+  <button class="btn btn-green" onclick="confirmNewSeed()">Я сохранил(а) — продолжить</button>
 </div>
 </div>
 
@@ -221,94 +278,80 @@ textarea.input{resize:vertical;min-height:70px}
 <div id="screen-app" class="screen">
 
   <!-- Вкладка: Кошелёк -->
-  <div id="tab-wallet" class="tab-content active" style="display:block">
+  <div id="tab-wallet" class="tab-content" style="display:block">
   <div class="page">
-    <div id="dev-banner-app" style="display:none" class="card">
-      <span style="color:var(--yellow);font-size:13px">⚠️ Режим разработки (DEV_MODE=true)</span>
-    </div>
+    <div id="dev-banner-app" style="display:none">Режим разработки (DEV_MODE=true)</div>
 
-    <div class="wallet-header">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">TON адрес</div>
-        <span id="mode-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;
-          background:rgba(255,255,255,.2);display:none"></span>
-      </div>
-      <div class="wallet-addr" id="hdr-addr">—</div>
-      <button class="wallet-copy" onclick="copyAddr()">Копировать</button>
-      <div id="eth-addr-row" style="display:none;margin-top:8px">
-        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">ETH адрес</div>
-        <div class="wallet-addr" id="hdr-eth-addr" style="font-size:11px">—</div>
-        <button onclick="copyEthAddr()" style="margin-top:4px;background:rgba(255,255,255,.15);
-          border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Копировать</button>
-      </div>
-      <div id="btc-addr-row" style="display:none;margin-top:8px">
-        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:2px">BTC адрес (SegWit)</div>
-        <div class="wallet-addr" id="hdr-btc-addr" style="font-size:11px">—</div>
-        <button onclick="copyBtcAddr()" style="margin-top:4px;background:rgba(255,255,255,.15);
-          border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Копировать</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button onclick="showQR()" style="background:rgba(255,255,255,.15);
-          border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer">
-          📷 QR
+    <!-- Общий баланс + действия -->
+    <div class="hero">
+      <div class="hero-label">Общий баланс</div>
+      <div class="hero-total" id="hero-total">$0.00</div>
+      <div class="hero-sub"><span id="mode-badge"></span></div>
+      <div class="qa-row">
+        <button class="qa" onclick="openDeposit()">
+          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
+          <span>Пополнить</span>
         </button>
-        <button id="btn-refresh" onclick="refreshBalances()" style="background:rgba(255,255,255,.15);
-          border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:none">
-          🔄 Обновить
+        <button class="qa" onclick="openWithdraw()">
+          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+          <span>Отправить</span>
         </button>
-        <button onclick="toggleAddrOverride()" style="background:rgba(255,255,255,.12);
-          border:none;color:rgba(255,255,255,.8);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">
-          ✏️ Адрес вручную
+        <button class="qa" onclick="switchTab('swap')">
+          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg></span>
+          <span>Обмен</span>
+        </button>
+        <button class="qa" onclick="showQR()">
+          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01"/></svg></span>
+          <span>Получить</span>
         </button>
       </div>
     </div>
 
-    <!-- Форма ручного ввода адреса -->
-    <div id="addr-override" class="card" style="display:none">
-      <h3>Ввести адрес вручную</h3>
-      <p style="font-size:12px;color:var(--hint);margin-bottom:10px">
-        Если деривация адреса не совпала с вашим кошельком — введите адрес сюда, балансы обновятся.
-      </p>
-      <div class="field"><label>TON адрес</label>
-        <input id="ov-ton" class="input" placeholder="EQ…"></div>
-      <div class="field"><label>EVM адрес (ETH / BNB)</label>
-        <input id="ov-eth" class="input" placeholder="0x…"></div>
-      <div class="field"><label>BTC адрес (native SegWit)</label>
-        <input id="ov-btc" class="input" placeholder="bc1q…"></div>
-      <div class="row-btns">
-        <button class="btn" onclick="applyAddrOverride()">Применить</button>
-        <button class="btn btn-sec" onclick="toggleAddrOverride()">Отмена</button>
+    <!-- Активы -->
+    <div class="sec-title">Активы</div>
+    <div class="assets card">
+      <div class="asset">
+        <div class="coin"><img src="/static/coins/ton.svg" alt="TON"></div>
+        <div class="asset-main"><div class="asset-name">Toncoin</div><div class="asset-sub">TON</div></div>
+        <div class="asset-right"><div class="asset-amt" id="b-TON">0</div><div class="asset-fiat" id="bf-TON">$0.00</div></div>
       </div>
-    </div>
-
-    <div class="bal-grid" id="bal-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="bal-item"><div class="bal-icon">💎</div><div class="bal-name">TON</div><div class="bal-val" id="b-TON">0</div></div>
-      <div class="bal-item"><div class="bal-icon">💵</div><div class="bal-name">USDT</div><div class="bal-val" id="b-USDT">0</div></div>
-      <div class="bal-item"><div class="bal-icon">⟠</div><div class="bal-name">ETH</div><div class="bal-val" id="b-ETH">0</div></div>
-      <div class="bal-item"><div class="bal-icon">🟡</div><div class="bal-name">BNB</div><div class="bal-val" id="b-BNB">0</div></div>
-      <div class="bal-item"><div class="bal-icon">₿</div><div class="bal-name">BTC</div><div class="bal-val" id="b-BTC">0</div></div>
-    </div>
-
-    <div class="row-btns">
-      <button class="btn btn-green" onclick="openDeposit()">↓ Пополнить</button>
-      <button class="btn btn-sec"   onclick="openWithdraw()">↑ Вывести</button>
+      <div class="asset">
+        <div class="coin"><img src="/static/coins/usdt.svg" alt="USDT"></div>
+        <div class="asset-main"><div class="asset-name">Tether</div><div class="asset-sub">USDT</div></div>
+        <div class="asset-right"><div class="asset-amt" id="b-USDT">0</div><div class="asset-fiat" id="bf-USDT">$0.00</div></div>
+      </div>
+      <div class="asset">
+        <div class="coin"><img src="/static/coins/eth.svg" alt="ETH"></div>
+        <div class="asset-main"><div class="asset-name">Ethereum</div><div class="asset-sub">ETH</div></div>
+        <div class="asset-right"><div class="asset-amt" id="b-ETH">0</div><div class="asset-fiat" id="bf-ETH">$0.00</div></div>
+      </div>
+      <div class="asset">
+        <div class="coin"><img src="/static/coins/bnb.svg" alt="BNB"></div>
+        <div class="asset-main"><div class="asset-name">BNB</div><div class="asset-sub">BNB</div></div>
+        <div class="asset-right"><div class="asset-amt" id="b-BNB">0</div><div class="asset-fiat" id="bf-BNB">$0.00</div></div>
+      </div>
+      <div class="asset">
+        <div class="coin"><img src="/static/coins/btc.svg" alt="BTC"></div>
+        <div class="asset-main"><div class="asset-name">Bitcoin</div><div class="asset-sub">BTC</div></div>
+        <div class="asset-right"><div class="asset-amt" id="b-BTC">0</div><div class="asset-fiat" id="bf-BTC">$0.00</div></div>
+      </div>
     </div>
 
     <!-- Deposit form -->
-    <div id="deposit-form" class="card" style="display:none;margin-top:12px">
+    <div id="deposit-form" class="card" style="display:none">
       <h3>Тестовое пополнение</h3>
       <div class="field"><label>Актив</label>
         <select id="dep-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
       <div class="field"><label>Сумма</label>
         <input id="dep-amount" class="input" type="number" min="0.001" step="any" value="10" placeholder="Сумма"></div>
       <div class="row-btns">
-        <button class="btn" onclick="doDeposit()">Зачислить</button>
+        <button class="btn btn-green" onclick="doDeposit()">Зачислить</button>
         <button class="btn btn-sec" onclick="closeDeposit()">Отмена</button>
       </div>
     </div>
 
     <!-- Withdraw form -->
-    <div id="withdraw-form" class="card" style="display:none;margin-top:12px">
+    <div id="withdraw-form" class="card" style="display:none">
       <h3>Вывод средств</h3>
       <div class="field"><label>Актив</label>
         <select id="wd-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
@@ -322,10 +365,51 @@ textarea.input{resize:vertical;min-height:70px}
       </div>
     </div>
 
-    <!-- History -->
-    <div class="card" style="margin-top:12px">
-      <h3>История операций</h3>
-      <div id="tx-list"><div style="color:var(--hint);font-size:14px;text-align:center;padding:16px">Нет операций</div></div>
+    <!-- Адреса -->
+    <div class="sec-title">Адреса кошелька</div>
+    <div class="card">
+      <div class="addr-block">
+        <div class="addr-label">TON</div>
+        <div class="addr-value" id="hdr-addr">—</div>
+        <button class="addr-copy" onclick="copyAddr()">Копировать</button>
+      </div>
+      <div class="addr-block" id="eth-addr-row" style="display:none">
+        <div class="addr-label">ETH / BNB (EVM)</div>
+        <div class="addr-value" id="hdr-eth-addr">—</div>
+        <button class="addr-copy" onclick="copyEthAddr()">Копировать</button>
+      </div>
+      <div class="addr-block" id="btc-addr-row" style="display:none">
+        <div class="addr-label">BTC (SegWit)</div>
+        <div class="addr-value" id="hdr-btc-addr">—</div>
+        <button class="addr-copy" onclick="copyBtcAddr()">Копировать</button>
+      </div>
+      <div class="addr-tools">
+        <button class="btn btn-sec btn-sm" onclick="showQR()">QR-код</button>
+        <button class="btn btn-sec btn-sm" id="btn-refresh" onclick="refreshBalances()" style="display:none">Обновить</button>
+        <button class="btn btn-sec btn-sm" onclick="toggleAddrOverride()">Ввести вручную</button>
+      </div>
+    </div>
+
+    <!-- Форма ручного ввода адреса -->
+    <div id="addr-override" class="card" style="display:none">
+      <h3>Ввести адрес вручную</h3>
+      <p class="hint-text">Если деривация адреса не совпала с вашим кошельком — введите адрес сюда, балансы обновятся.</p>
+      <div class="field"><label>TON адрес</label>
+        <input id="ov-ton" class="input" placeholder="EQ…"></div>
+      <div class="field"><label>EVM адрес (ETH / BNB)</label>
+        <input id="ov-eth" class="input" placeholder="0x…"></div>
+      <div class="field"><label>BTC адрес (native SegWit)</label>
+        <input id="ov-btc" class="input" placeholder="bc1q…"></div>
+      <div class="row-btns">
+        <button class="btn" onclick="applyAddrOverride()">Применить</button>
+        <button class="btn btn-sec" onclick="toggleAddrOverride()">Отмена</button>
+      </div>
+    </div>
+
+    <!-- История -->
+    <div class="sec-title">История операций</div>
+    <div class="card">
+      <div id="tx-list" class="tx-list"><div class="empty">Нет операций</div></div>
     </div>
   </div>
   </div>
@@ -357,7 +441,7 @@ textarea.input{resize:vertical;min-height:70px}
       <button class="btn" onclick="createCheck()">Создать чек</button>
       <div id="check-result" style="display:none" class="result-box">
         Код чека: <code id="check-code"></code>
-        <button class="btn btn-sm btn-sec" style="margin-top:8px" onclick="copyCheckCode()">📋 Скопировать код</button>
+        <button class="btn btn-sec btn-sm" style="margin-top:10px" onclick="copyCheckCode()">Скопировать код</button>
       </div>
     </div>
 
@@ -366,7 +450,7 @@ textarea.input{resize:vertical;min-height:70px}
       <div class="field"><label>Код чека</label>
         <input id="act-code" class="input" placeholder="Вставьте код…"></div>
       <button class="btn btn-green" onclick="activateCheck()">Получить</button>
-      <div id="check-info" style="display:none;margin-top:10px;font-size:14px;color:var(--hint)"></div>
+      <div id="check-info" style="display:none;margin-top:12px;font-size:14px;color:var(--hint)"></div>
     </div>
   </div>
   </div>
@@ -386,7 +470,7 @@ textarea.input{resize:vertical;min-height:70px}
       <div id="invoice-result" style="display:none" class="result-box">
         ID счёта: <code id="invoice-id-out"></code>
         <div style="color:var(--hint);font-size:12px;margin-top:4px">Передайте этот код плательщику</div>
-        <button class="btn btn-sm btn-sec" style="margin-top:8px" onclick="copyInvoiceId()">📋 Скопировать ID</button>
+        <button class="btn btn-sec btn-sm" style="margin-top:10px" onclick="copyInvoiceId()">Скопировать ID</button>
       </div>
     </div>
 
@@ -394,8 +478,8 @@ textarea.input{resize:vertical;min-height:70px}
       <h3>Оплатить счёт</h3>
       <div class="field"><label>ID счёта</label>
         <input id="pay-inv-id" class="input" placeholder="Вставьте ID счёта…"></div>
-      <button class="btn btn-sec" onclick="lookupInvoice()">🔍 Проверить</button>
-      <div id="inv-lookup" style="display:none;margin:10px 0;font-size:14px"></div>
+      <button class="btn btn-sec" onclick="lookupInvoice()">Проверить</button>
+      <div id="inv-lookup" style="display:none;margin:12px 0;font-size:14px"></div>
       <button class="btn btn-green" id="btn-pay-inv" style="display:none;margin-top:4px" onclick="payInvoice()">Оплатить</button>
     </div>
   </div>
@@ -406,40 +490,33 @@ textarea.input{resize:vertical;min-height:70px}
   <div class="page">
     <div class="card">
       <h3>Обмен активов</h3>
-      <div class="swap-wrap">
-        <div class="field"><label>Отдаёте</label>
-          <div style="display:flex;gap:8px">
-            <select id="sw-from" class="input" style="width:110px;flex-shrink:0" onchange="updateRate()">
-              <option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option>
-            </select>
-            <input id="sw-amount" class="input" type="number" min="0.001" step="any"
-              placeholder="0.00" oninput="updateRate()">
-          </div>
+      <div class="field"><label>Отдаёте</label>
+        <div style="display:flex;gap:8px">
+          <select id="sw-from" class="input" style="width:118px;flex-shrink:0" onchange="updateRate()">
+            <option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option>
+          </select>
+          <input id="sw-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00" oninput="updateRate()">
         </div>
-        <div class="swap-arrow" onclick="swapAssets()">⇅</div>
-        <div class="field"><label>Получаете</label>
-          <div style="display:flex;gap:8px">
-            <select id="sw-to" class="input" style="width:110px;flex-shrink:0" onchange="updateRate()">
-              <option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option>
-            </select>
-            <input id="sw-result" class="input" readonly placeholder="—" style="color:var(--hint)">
-          </div>
-        </div>
-        <div id="rate-info" class="rate-info">Введите сумму для расчёта курса</div>
       </div>
-      <button class="btn" style="margin-top:12px" onclick="doSwap()">Обменять</button>
+      <div class="swap-arrow" onclick="swapAssets()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v16M8 20l-3-3M8 4l3 3M16 20V4M16 4l3 3M16 20l-3-3"/></svg></div>
+      <div class="field" style="margin-bottom:0"><label>Получаете</label>
+        <div style="display:flex;gap:8px">
+          <select id="sw-to" class="input" style="width:118px;flex-shrink:0" onchange="updateRate()">
+            <option>USDT</option><option>TON</option><option>ETH</option><option>BNB</option><option>BTC</option>
+          </select>
+          <input id="sw-result" class="input" readonly placeholder="—" style="color:var(--hint)">
+        </div>
+      </div>
+      <div id="rate-info" class="rate-info">Введите сумму для расчёта курса</div>
+      <button class="btn" style="margin-top:14px" onclick="doSwap()">Обменять</button>
     </div>
     <div class="card">
       <h3>Тестовые курсы</h3>
-      <div style="font-size:13px;color:var(--hint);line-height:1.9">
-        💎 TON → 💵 USDT: <b>7.50</b><br>
-        ⟠ ETH → 💵 USDT: <b>3 200</b><br>
-        🟡 BNB → 💵 USDT: <b>600</b><br>
-        ₿ BTC → 💵 USDT: <b>95 000</b><br>
-        ⟠ ETH → 💎 TON: <b>426.6</b><br>
-        ₿ BTC → 💎 TON: <b>12 666</b><br>
-        ₿ BTC → ⟠ ETH: <b>29.67</b><br>
-        🟡 BNB → ⟠ ETH: <b>0.1875</b>
+      <div class="rate-table">
+        <div><span>TON / USDT</span><b>7.50</b></div>
+        <div><span>ETH / USDT</span><b>3 200</b></div>
+        <div><span>BNB / USDT</span><b>600</b></div>
+        <div><span>BTC / USDT</span><b>95 000</b></div>
       </div>
     </div>
   </div>
@@ -471,9 +548,9 @@ textarea.input{resize:vertical;min-height:70px}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h3 style="margin:0">Открытые ордера</h3>
-        <button class="btn btn-sm btn-sec" onclick="loadP2P()">↻ Обновить</button>
+        <button class="btn btn-sec btn-sm" onclick="loadP2P()">Обновить</button>
       </div>
-      <div id="p2p-list"><div style="color:var(--hint);text-align:center;padding:16px;font-size:14px">Загрузка…</div></div>
+      <div id="p2p-list"><div class="empty">Загрузка…</div></div>
     </div>
   </div>
   </div>
@@ -481,19 +558,24 @@ textarea.input{resize:vertical;min-height:70px}
   <!-- Нижняя навигация -->
   <nav class="bottom-nav">
     <div class="nav-item active" data-tab="wallet" onclick="switchTab('wallet')">
-      <span class="nav-icon">💰</span><span>Кошелёк</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H5"/><circle cx="16.5" cy="13" r="1.3" fill="currentColor" stroke="none"/></svg>
+      <span>Кошелёк</span>
     </div>
     <div class="nav-item" data-tab="transfer" onclick="switchTab('transfer')">
-      <span class="nav-icon">💸</span><span>Переводы</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+      <span>Переводы</span>
     </div>
     <div class="nav-item" data-tab="invoice" onclick="switchTab('invoice')">
-      <span class="nav-icon">📋</span><span>Счета</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+      <span>Счета</span>
     </div>
     <div class="nav-item" data-tab="swap" onclick="switchTab('swap')">
-      <span class="nav-icon">🔄</span><span>Своп</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4v0"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4v0"/></svg>
+      <span>Своп</span>
     </div>
     <div class="nav-item" data-tab="p2p" onclick="switchTab('p2p')">
-      <span class="nav-icon">🤝</span><span>P2P</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.2A3 3 0 0 1 18 11"/><path d="M18.5 15c2 .6 3.5 2 3.5 4"/></svg>
+      <span>P2P</span>
     </div>
   </nav>
 </div>
@@ -504,9 +586,8 @@ textarea.input{resize:vertical;min-height:70px}
     <h3>Адрес для пополнения</h3>
     <img id="qr-img" src="" alt="QR">
     <div class="modal-addr" id="qr-addr"></div>
-    <button class="btn btn-sm btn-sec" onclick="copyAddr();closeQR()">📋 Скопировать адрес</button>
-    <br>
-    <button class="btn btn-sm modal-close" onclick="closeQR()">Закрыть</button>
+    <button class="btn btn-sec btn-sm" onclick="copyAddr();closeQR()">Скопировать адрес</button>
+    <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="closeQR()">Закрыть</button>
   </div>
 </div>
 
@@ -519,6 +600,10 @@ const initData = tg?.initData || "";
 
 // Когда HTML открыт как file://, запросы к /api/... идут на localhost:8000
 const BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
+
+// Тестовые курсы к USD — для подсчёта фиат-эквивалента и общего баланса
+const RATES = { TON: 7.5, USDT: 1, ETH: 3200, BNB: 600, BTC: 95000 };
+const ASSET_LIST = ["TON", "USDT", "ETH", "BNB", "BTC"];
 
 const state = {
   wallet: null,
@@ -574,11 +659,7 @@ async function init() {
       showScreen("connect");
     }
   } catch (e) {
-    if (e.message.includes("401")) {
-      showScreen("connect");
-    } else {
-      showScreen("connect");
-    }
+    showScreen("connect");
     toast(e.message, "err");
   }
 }
@@ -600,11 +681,11 @@ function showApp() {
   state.addresses = w.addresses || {};
   const badge = document.getElementById("mode-badge");
   if (state.realMode) {
-    badge.textContent = "🌐 Реальный блокчейн";
+    badge.textContent = "Реальный блокчейн";
     badge.style.display = "inline-block";
     document.getElementById("btn-refresh").style.display = "inline-block";
   } else {
-    badge.textContent = "🧪 Тест";
+    badge.textContent = "Тестовый режим";
     badge.style.display = "inline-block";
     document.getElementById("btn-refresh").style.display = "none";
   }
@@ -634,7 +715,7 @@ async function connectSeed() {
   const seed = document.getElementById("seed-input").value.trim();
   if (!seed) { toast("Введите seed-фразу", "err"); return; }
   const btn = document.getElementById("btn-connect");
-  btn.disabled = true; btn.textContent = "Подключение и загрузка балансов…";
+  btn.disabled = true; btn.textContent = "Подключение…";
   try {
     const data = await api("POST", "/api/wallet/connect", { seed });
     state.wallet = {
@@ -647,7 +728,7 @@ async function connectSeed() {
     state.newSeed = null;
     showApp();
     if (data.real_mode) {
-      toast("✅ Реальные балансы загружены с блокчейна", "ok");
+      toast("Реальные балансы загружены с блокчейна", "ok");
     } else {
       toast("Кошелёк подключён (тест-режим)", "ok");
     }
@@ -689,17 +770,24 @@ function copySeed() {
 
 function confirmNewSeed() {
   showApp();
-  toast("Кошелёк создан ✓", "ok");
+  toast("Кошелёк создан", "ok");
 }
 
 // ── Balances ─────────────────────────────────────────────────────────────────
 function updateBalances(bal) {
   if (!bal) return;
-  document.getElementById("b-TON").textContent  = fmtAmt(bal.TON,  "TON");
-  document.getElementById("b-USDT").textContent = fmtAmt(bal.USDT, "USDT");
-  document.getElementById("b-ETH").textContent  = fmtAmt(bal.ETH  || 0, "ETH");
-  document.getElementById("b-BNB").textContent  = fmtAmt(bal.BNB  || 0, "BNB");
-  document.getElementById("b-BTC").textContent  = fmtAmt(bal.BTC,  "BTC");
+  let total = 0;
+  for (const a of ASSET_LIST) {
+    const amt = Number(bal[a] || 0);
+    const amtEl  = document.getElementById("b-" + a);
+    const fiatEl = document.getElementById("bf-" + a);
+    if (amtEl)  amtEl.textContent  = fmtAmt(amt, a);
+    const usd = amt * (RATES[a] || 0);
+    if (fiatEl) fiatEl.textContent = fmtUsd(usd);
+    total += usd;
+  }
+  const totalEl = document.getElementById("hero-total");
+  if (totalEl) totalEl.textContent = fmtUsd(total);
   if (state.wallet) state.wallet.balances = bal;
 }
 
@@ -709,6 +797,10 @@ function fmtAmt(n, asset) {
   if (asset === "ETH")  return Number(n).toFixed(6);
   if (asset === "BNB")  return Number(n).toFixed(4);
   return Number(n).toFixed(4);
+}
+
+function fmtUsd(n) {
+  return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDate(ts) {
@@ -723,14 +815,15 @@ function switchTab(tab) {
     el.classList.toggle("active", el.dataset.tab === tab));
   document.querySelectorAll(".tab-content").forEach(el =>
     el.style.display = el.id === "tab-" + tab ? "block" : "none");
+  window.scrollTo(0, 0);
   if (tab === "p2p") loadP2P();
   if (tab === "wallet") loadHistory();
 }
 
 // ── Wallet: Deposit / Withdraw ────────────────────────────────────────────────
-function openDeposit()  { document.getElementById("deposit-form").style.display = "block"; }
+function openDeposit()  { const f=document.getElementById("deposit-form"); f.style.display="block"; f.scrollIntoView({behavior:"smooth",block:"center"}); }
 function closeDeposit() { document.getElementById("deposit-form").style.display = "none"; }
-function openWithdraw() { document.getElementById("withdraw-form").style.display = "block"; }
+function openWithdraw() { const f=document.getElementById("withdraw-form"); f.style.display="block"; f.scrollIntoView({behavior:"smooth",block:"center"}); }
 function closeWithdraw(){ document.getElementById("withdraw-form").style.display = "none"; }
 
 async function doDeposit() {
@@ -783,15 +876,16 @@ const TX_DIR = {
   withdraw:"out", transfer_out:"out", check_out:"out",
   swap:"swap",
 };
-const TX_ICON = {
-  deposit:"⬇️", withdraw:"⬆️", transfer_out:"➡️",
-  transfer_in:"⬅️", swap:"🔄", check_in:"🎫", check_out:"🎫",
+const TX_SVG = {
+  in:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  out:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
 };
 
 function renderHistory(list) {
   const el = document.getElementById("tx-list");
   if (!list || !list.length) {
-    el.innerHTML = `<div style="color:var(--hint);font-size:14px;text-align:center;padding:16px">Нет операций</div>`;
+    el.innerHTML = `<div class="empty">Нет операций</div>`;
     return;
   }
   el.innerHTML = list.slice(0, 30).map(tx => {
@@ -801,7 +895,7 @@ function renderHistory(list) {
     const lbl  = TX_LABEL[tx.type] || tx.type;
     const sub  = tx.comment || (tx.address ? tx.address.slice(0,20)+"…" : fmtDate(tx.ts));
     return `<div class="tx-item">
-      <div class="tx-icon ${cls}">${TX_ICON[tx.type]||"•"}</div>
+      <div class="tx-icon ${cls}">${TX_SVG[cls]||TX_SVG.out}</div>
       <div class="tx-info">
         <div class="tx-label">${lbl}</div>
         <div class="tx-sub">${sub}</div>
@@ -852,11 +946,9 @@ async function createCheck() {
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   try {
     const d = await api("POST", "/api/check/create", { asset, amount, comment });
-    updateBalances(d.check ? state.wallet.balances : state.wallet.balances);
     document.getElementById("check-code").textContent = d.code;
     document.getElementById("check-result").style.display = "block";
     document.getElementById("ch-amount").value = "";
-    // Refresh balances
     const wd = await api("GET", "/api/wallet");
     updateBalances(wd.balances);
     toast("Чек создан", "ok");
@@ -876,9 +968,9 @@ async function activateCheck() {
     updateBalances(d.balances);
     document.getElementById("check-info").style.display = "block";
     document.getElementById("check-info").textContent =
-      `✅ Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
+      `Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
     document.getElementById("act-code").value = "";
-    toast("Чек активирован ✓", "ok");
+    toast("Чек активирован", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
 
@@ -930,9 +1022,9 @@ async function payInvoice() {
     updateBalances(d.balances);
     document.getElementById("btn-pay-inv").style.display = "none";
     document.getElementById("inv-lookup").innerHTML +=
-      `<br><span style="color:var(--green)">✅ Оплачено</span>`;
+      `<br><span style="color:var(--green)">Оплачено</span>`;
     document.getElementById("pay-inv-id").value = "";
-    toast("Счёт оплачен ✓", "ok");
+    toast("Счёт оплачен", "ok");
     state.currentInvoice = null;
   } catch (e) { toast(e.message, "err"); }
 }
@@ -972,7 +1064,7 @@ async function doSwap() {
     document.getElementById("sw-amount").value = "";
     document.getElementById("sw-result").value = "";
     document.getElementById("rate-info").textContent = "Введите сумму для расчёта курса";
-    toast(`Получено ${fmtAmt(d.received, to_asset)} ${to_asset} ✓`, "ok");
+    toast(`Получено ${fmtAmt(d.received, to_asset)} ${to_asset}`, "ok");
   } catch (e) { toast(e.message, "err"); }
 }
 
@@ -992,14 +1084,14 @@ async function loadP2P() {
     renderP2P(d.orders);
   } catch (e) {
     document.getElementById("p2p-list").innerHTML =
-      `<div style="color:var(--danger);text-align:center;padding:16px;font-size:14px">${e.message}</div>`;
+      `<div class="empty" style="color:var(--red)">${e.message}</div>`;
   }
 }
 
 function renderP2P(orders) {
   const el = document.getElementById("p2p-list");
   if (!orders || !orders.length) {
-    el.innerHTML = `<div style="color:var(--hint);text-align:center;padding:16px;font-size:14px">Нет открытых ордеров</div>`;
+    el.innerHTML = `<div class="empty">Нет открытых ордеров</div>`;
     return;
   }
   el.innerHTML = orders.map(o => {
@@ -1008,7 +1100,7 @@ function renderP2P(orders) {
     return `<div class="order-card">
       <div class="order-top">
         <span class="badge ${isBuy ? "badge-buy" : "badge-sell"}">${o.type}</span>
-        <span style="font-size:12px;color:var(--hint)">${o.creator_name}</span>
+        <span style="font-size:12.5px;color:var(--hint)">${o.creator_name}</span>
       </div>
       <div class="order-info">${fmtAmt(o.amount, o.asset)} ${o.asset} по цене ${o.price} ${o.currency}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1035,10 +1127,9 @@ async function createOrder() {
     await api("POST", "/api/p2p/order", { type, asset, amount, price, currency });
     document.getElementById("p2p-amount").value = "";
     document.getElementById("p2p-price").value  = "";
-    // Refresh balances after SELL
     const wd = await api("GET", "/api/wallet");
     updateBalances(wd.balances);
-    toast("Ордер размещён ✓", "ok");
+    toast("Ордер размещён", "ok");
     loadP2P();
   } catch (e) { toast(e.message, "err"); }
 }
@@ -1047,7 +1138,7 @@ async function takeOrder(id) {
   try {
     const d = await api("POST", `/api/p2p/order/${id}/take`);
     updateBalances(d.balances);
-    toast("Ордер закрыт ✓", "ok");
+    toast("Ордер закрыт", "ok");
     loadP2P();
   } catch (e) { toast(e.message, "err"); }
 }
@@ -1055,21 +1146,22 @@ async function takeOrder(id) {
 // ── Refresh с блокчейна ──────────────────────────────────────────────────────
 async function refreshBalances() {
   const btn = document.getElementById("btn-refresh");
-  btn.textContent = "⏳ …";
+  const prev = btn.textContent;
+  btn.textContent = "…";
   btn.disabled = true;
   try {
     const d = await api("POST", "/api/wallet/refresh");
     updateBalances(d.balances);
-    if (d.refreshed) toast("Балансы обновлены с блокчейна ✓", "ok");
+    if (d.refreshed) toast("Балансы обновлены с блокчейна", "ok");
     else toast(d.message || "Нет данных", "");
   } catch (e) {
     toast(e.message, "err");
   } finally {
-    btn.textContent = "🔄 Обновить"; btn.disabled = false;
+    btn.textContent = prev; btn.disabled = false;
   }
 }
 
-// ── BTC address copy ─────────────────────────────────────────────────────────
+// ── Address copy ─────────────────────────────────────────────────────────────
 function copyEthAddr() {
   const addr = state.addresses.ETH || "";
   if (addr) copyToClipboard(addr);
@@ -1087,6 +1179,7 @@ function toggleAddrOverride() {
     document.getElementById("ov-ton").value = state.addresses.TON || "";
     document.getElementById("ov-eth").value = state.addresses.ETH || "";
     document.getElementById("ov-btc").value = state.addresses.BTC || "";
+    el.scrollIntoView({behavior:"smooth",block:"center"});
   }
 }
 
@@ -1117,7 +1210,7 @@ async function applyAddrOverride() {
       updateBalances(d.balances);
     }
     toggleAddrOverride();
-    toast("Адреса обновлены, балансы загружены ✓", "ok");
+    toast("Адреса обновлены, балансы загружены", "ok");
   } catch (e) {
     toast(e.message, "err");
   }
@@ -1126,7 +1219,7 @@ async function applyAddrOverride() {
 // ── Clipboard ────────────────────────────────────────────────────────────────
 function copyToClipboard(text) {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => toast("Скопировано ✓", "ok")).catch(() => fallbackCopy(text));
+    navigator.clipboard.writeText(text).then(() => toast("Скопировано", "ok")).catch(() => fallbackCopy(text));
   } else {
     fallbackCopy(text);
   }
@@ -1137,7 +1230,7 @@ function fallbackCopy(text) {
   document.body.appendChild(ta); ta.select();
   document.execCommand("copy");
   document.body.removeChild(ta);
-  toast("Скопировано ✓", "ok");
+  toast("Скопировано", "ok");
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
