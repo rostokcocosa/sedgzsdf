@@ -1166,7 +1166,7 @@ function selectChip(prefix, asset) {
 // ── Ввод seed-фразы: выбор длины + пронумерованные поля + автодополнение ──
 // (как в большинстве криптокошельков: вводишь слово — показываются варианты
 // из официального словаря BIP-39; можно вставить фразу целиком в любое поле.)
-const SEED_LENGTHS = [12, 15, 18, 21, 24];
+const SEED_LENGTHS = [12, 18, 24];
 let _bip39Words = null;
 async function loadBip39Wordlist() {
   if (_bip39Words) return _bip39Words;
