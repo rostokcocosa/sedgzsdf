@@ -380,23 +380,57 @@ def verify_init_data(init_data: str) -> Optional[dict]:
         return None
 
 
+def _parse_init_data_user(init_data: str) -> Optional[dict]:
+    """Достаёт объект user из initData БЕЗ проверки подписи.
+
+    Используется только в DEV_MODE, чтобы у каждого Telegram-аккаунта был свой
+    кошелёк даже когда HMAC не сходится (например, локальный BOT_TOKEN отличается).
+    """
+    if not init_data:
+        return None
+    try:
+        parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        user_json = parsed.get("user")
+        if not user_json:
+            return None
+        return json.loads(user_json)
+    except Exception:
+        return None
+
+
 def auth_user(init_data: str) -> dict:
+    # 1) Боевой путь: валидная подпись initData → реальный пользователь.
+    user_data = verify_init_data(init_data) if init_data else None
+
+    # 2) DEV_MODE: подпись не прошла, но initData есть (открыто из Telegram) —
+    #    берём реального пользователя из initData БЕЗ проверки подписи,
+    #    чтобы у каждого аккаунта был СВОЙ кошелёк, а не общий.
+    if not user_data and DEV_MODE and init_data:
+        user_data = _parse_init_data_user(init_data)
+
+    if user_data and user_data.get("id") is not None:
+        return get_or_create_user(
+            int(user_data["id"]),
+            user_data.get("username", ""),
+            user_data.get("first_name", "User"),
+        )
+
+    # 3) DEV_MODE без initData (открыто из обычного браузера, не из Telegram) —
+    #    единственный случай общего dev-кошелька.
     if DEV_MODE:
         return get_or_create_user(99999, "devuser", "Dev User")
+
+    # 4) Прод без валидной подписи → отказ.
     if not init_data:
-        raise HTTPException(401, detail="initData РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РћС‚РєСЂРѕР№С‚Рµ РїСЂРёР»РѕР¶РµРЅРёРµ РёР· Telegram.")
-    user_data = verify_init_data(init_data)
-    if not user_data:
-        raise HTTPException(
-            401,
-            detail=(
-                "РџСЂРѕРІРµСЂРєР° HMAC-SHA256 initData РЅРµ РїСЂРѕС€Р»Р°. "
-                "Р’РѕР·РјРѕР¶РЅС‹Рµ РїСЂРёС‡РёРЅС‹: РЅРµРІРµСЂРЅС‹Р№ BOT_TOKEN, "
-                "РїСЂРёР»РѕР¶РµРЅРёРµ РѕС‚РєСЂС‹С‚Рѕ РЅРµ РёР· Telegram, РёР»Рё РїРѕРґРїРёСЃСЊ СѓСЃС‚Р°СЂРµР»Р°."
-            ),
-        )
-    user_id = int(user_data["id"])
-    return get_or_create_user(user_id, user_data.get("username", ""), user_data.get("first_name", "User"))
+        raise HTTPException(401, detail="initData отсутствует. Откройте приложение из Telegram.")
+    raise HTTPException(
+        401,
+        detail=(
+            "Проверка HMAC-SHA256 initData не прошла. "
+            "Возможные причины: неверный BOT_TOKEN, "
+            "приложение открыто не из Telegram, или подпись устарела."
+        ),
+    )
 
 
 # в”Ђв”Ђ FastAPI РїСЂРёР»РѕР¶РµРЅРёРµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -1098,21 +1132,59 @@ p2p_orders.extend([
 
 
 # в”Ђв”Ђ РўРѕС‡РєР° РІС…РѕРґР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+async def _configure_bot(bot) -> None:
+    """Самонастройка бота при старте: команды меню + кнопка запуска Mini App.
+
+    Делает деплой самодостаточным — не нужно вручную настраивать меню в BotFather.
+    Кнопка-меню и inline-кнопка всегда указывают на актуальный WEBAPP_URL.
+    """
+    from aiogram.types import (
+        BotCommand, MenuButtonWebApp, MenuButtonCommands, WebAppInfo,
+    )
+    try:
+        await bot.set_my_commands([
+            BotCommand(command="start",  description="Запуск / открыть кошелёк"),
+            BotCommand(command="seed",   description="Показать seed-фразу"),
+            BotCommand(command="status", description="Показать баланс"),
+        ])
+        if WEBAPP_URL.startswith("https://"):
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="DeFi Wallet",
+                    web_app=WebAppInfo(url=WEBAPP_URL),
+                )
+            )
+            print(f"[BOT] Кнопка-меню Mini App → {WEBAPP_URL}")
+        else:
+            # Без HTTPS Telegram не примет WebApp — откатываемся на обычное меню команд.
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+            print("[BOT][WARN] WEBAPP_URL не https:// — кнопка Mini App отключена. "
+                  f"Текущее значение: {WEBAPP_URL!r}")
+    except Exception as e:
+        print(f"[BOT][WARN] Не удалось настроить меню бота: {e}")
+
+
 async def main():
     print(f"[APP] WEBAPP_URL = {WEBAPP_URL}")
-    print(f"[APP] BOT_TOKEN  = {'...'+BOT_TOKEN[-8:] if BOT_TOKEN else 'РЅРµ Р·Р°РґР°РЅ'}")
+    print(f"[APP] BOT_TOKEN  = {'...'+BOT_TOKEN[-8:] if BOT_TOKEN else 'не задан'}")
     print(f"[APP] DEV_MODE   = {DEV_MODE}")
-    print(f"[APP] BLOCKCHAIN = {'РґРѕСЃС‚СѓРїРµРЅ (bip_utils + aiohttp)' if BLOCKCHAIN_AVAILABLE else 'РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” pip install bip_utils aiohttp'}")
-    print(f"[APP] РЎРµСЂРІРµСЂ     : http://0.0.0.0:{PORT}")
+    print(f"[APP] BLOCKCHAIN = {'доступен (bip_utils + aiohttp)' if BLOCKCHAIN_AVAILABLE else 'недоступен — pip install bip_utils aiohttp'}")
+    print(f"[APP] Сервер     : http://0.0.0.0:{PORT}")
+    if not WEBAPP_URL.startswith("https://"):
+        print("[APP][WARN] WEBAPP_URL не начинается с https:// — кнопка Mini App "
+              "не появится. Задайте WEBAPP_URL в переменных окружения (Railway → Variables).")
 
     config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
     server = uvicorn.Server(config)
 
     if _bot and _dp:
-        print("[BOT] Р—Р°РїСѓСЃРє long pollingвЂ¦")
+        print("[BOT] Запуск long polling…")
+        await _configure_bot(_bot)
         await asyncio.gather(server.serve(), _dp.start_polling(_bot, handle_signals=False))
         await _bot.session.close()
     else:
+        print("[APP][WARN] BOT_TOKEN не задан — бот не запущен, работает только веб-сервер. "
+              "Задайте BOT_TOKEN в переменных окружения (Railway → Variables), чтобы бот отвечал на команды.")
         await server.serve()
 
 
