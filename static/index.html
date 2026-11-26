@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Kelta Wallet</title>
+<link rel="icon" type="image/png" href="/static/logo.png">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -188,9 +189,9 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .connect-wrap{display:flex;flex-direction:column;align-items:center;
   padding:52px 18px calc(40px + env(safe-area-inset-bottom));min-height:100vh}
 .connect-logo{width:84px;height:84px;border-radius:24px;display:flex;align-items:center;
-  justify-content:center;margin-bottom:18px;
-  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#8b5cf6));
+  justify-content:center;margin-bottom:18px;overflow:hidden;
   box-shadow:0 6px 16px rgba(0,0,0,.14)}
+.connect-logo img{width:100%;height:100%;object-fit:cover;display:block}
 .connect-title{font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
 .connect-hint{color:var(--hint);text-align:center;margin-bottom:26px;font-size:14.5px;max-width:300px}
 .connect-wrap .card{width:100%;max-width:420px}
@@ -585,7 +586,7 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 <!-- ══ Экран подключения ══ -->
 <div id="screen-connect" class="screen">
 <div class="connect-wrap">
-  <div class="connect-logo"><svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M14 9h20l6 9-16 21L8 18z"/><path d="M8 18h32M19 9l5 30M29 9l-5 30"/></svg></div>
+  <div class="connect-logo"><img src="/static/logo.png" alt="Kelta Wallet"></div>
   <div class="connect-title">Kelta Wallet</div>
   <div class="connect-hint">Подключите существующий кошелёк или создайте новый за секунду</div>
 
