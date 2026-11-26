@@ -53,9 +53,6 @@ ADMIN_ID: int | None = int(os.environ["ADMIN_ID"]) if os.environ.get("ADMIN_ID",
 users: dict[int, dict] = {}
 transactions: dict[int, list] = {}
 stakes: dict[int, list] = {}   # активные/закрытые стейки по пользователю (мультикошелёк)
-checks: dict[str, dict] = {}
-invoices: dict[str, dict] = {}
-p2p_orders: list[dict] = []
 
 # в”Ђв”Ђ Persistence (SQLite, переживает рестарты) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 # На Railway задайте DB_FILE=/data/wallet.db и примонтируйте Volume на /data,
@@ -127,18 +124,6 @@ def init_db() -> None:
                 started_at    TEXT,
                 status        TEXT
             );
-            CREATE TABLE IF NOT EXISTS checks (
-                code TEXT PRIMARY KEY,
-                data TEXT
-            );
-            CREATE TABLE IF NOT EXISTS invoices (
-                id   TEXT PRIMARY KEY,
-                data TEXT
-            );
-            CREATE TABLE IF NOT EXISTS p2p_orders (
-                id   TEXT PRIMARY KEY,
-                data TEXT
-            );
             CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
             CREATE INDEX IF NOT EXISTS idx_tx_user_wallet ON wallet_transactions(user_id, wallet_index);
             CREATE INDEX IF NOT EXISTS idx_stakes_user_wallet ON wallet_stakes(user_id, wallet_index);
@@ -167,8 +152,7 @@ def save_state() -> None:
         conn = _db()
         cur = conn.cursor()
         cur.execute("BEGIN")
-        for tbl in ("users", "wallets", "wallet_transactions", "wallet_stakes",
-                    "checks", "invoices", "p2p_orders"):
+        for tbl in ("users", "wallets", "wallet_transactions", "wallet_stakes"):
             cur.execute(f"DELETE FROM {tbl}")
 
         for uid, u in users.items():
@@ -205,17 +189,6 @@ def save_state() -> None:
                          s.get("started_at"), s.get("status")),
                     )
 
-        for code, c in checks.items():
-            cur.execute("INSERT INTO checks (code, data) VALUES (?,?)",
-                        (code, json.dumps(c, ensure_ascii=False, default=str)))
-        for iid, inv in invoices.items():
-            cur.execute("INSERT INTO invoices (id, data) VALUES (?,?)",
-                        (iid, json.dumps(inv, ensure_ascii=False, default=str)))
-        for o in p2p_orders:
-            if str(o.get("id", "")).startswith("demo_"):
-                continue
-            cur.execute("INSERT INTO p2p_orders (id, data) VALUES (?,?)",
-                        (o.get("id"), json.dumps(o, ensure_ascii=False, default=str)))
         conn.commit()
     except Exception as e:
         print(f"[DB] save: {e}")
@@ -238,12 +211,6 @@ def _migrate_legacy_json() -> bool:
             data = json.load(f)
         for k, v in (data.get("users") or {}).items():
             users[int(k)] = v
-        checks.update(data.get("checks") or {})
-        invoices.update(data.get("invoices") or {})
-        existing = {o.get("id") for o in p2p_orders}
-        for o in (data.get("p2p_orders") or []):
-            if o.get("id") not in existing:
-                p2p_orders.append(o)
         print(f"[DB] миграция из старого {_LEGACY_DATA_FILE}: users={len(users)}")
         return True
     except Exception as e:
@@ -322,20 +289,7 @@ def load_state() -> None:
                 transactions[uid] = []
                 stakes[uid] = []
 
-        cur.execute("SELECT code, data FROM checks")
-        for row in cur.fetchall():
-            checks[row["code"]] = json.loads(row["data"])
-        cur.execute("SELECT id, data FROM invoices")
-        for row in cur.fetchall():
-            invoices[row["id"]] = json.loads(row["data"])
-        cur.execute("SELECT id, data FROM p2p_orders")
-        existing = {o.get("id") for o in p2p_orders}
-        for row in cur.fetchall():
-            d = json.loads(row["data"])
-            if d.get("id") not in existing:
-                p2p_orders.append(d)
-
-        print(f"[DB] загружено: users={len(users)}, checks={len(checks)}, invoices={len(invoices)}")
+        print(f"[DB] загружено: users={len(users)}")
     except Exception as e:
         print(f"[DB] load: {e}")
     finally:
@@ -1539,158 +1493,6 @@ async def api_transfer(request: Request, x_init_data: str = Header(None)):
     return {"ok": True, "tx": tx, "balances": user["balances"]}
 
 
-# в”Ђв”Ђ API: С‡РµРєРё в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-@app.post("/api/check/create")
-async def api_check_create(request: Request, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    body = await request.json()
-    asset = body.get("asset", "TON")
-    amount = float(body.get("amount", 0))
-    comment = body.get("comment", "")
-    if amount <= 0:
-        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
-    if user["balances"].get(asset, 0) < amount:
-        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
-    user["balances"][asset] -= amount
-    code = secrets.token_urlsafe(8)
-    checks[code] = {
-        "creator_id": user["id"], "amount": amount,
-        "asset": asset, "comment": comment, "used": False,
-        "ts": _now(),
-    }
-    add_tx(user["id"], "check_out", asset, amount, comment=f"Р§РµРє {code[:6]}вЂ¦")
-    _ch_msg = (
-        f"🎫 <b>СОЗДАН ЧЕК</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Создатель: {_user_label(user)}\n"
-        f"💎 Актив: <b>{asset}</b>\n"
-        f"💰 Сумма: <b>{amount}</b>\n"
-        f"🔑 Полный код: <code>{code}</code>\n"
-    )
-    if comment:
-        _ch_msg += f"💬 Комментарий: {comment}\n"
-    _ch_msg += f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
-    await notify_admin(_ch_msg)
-    return {"ok": True, "code": code, "check": checks[code]}
-
-
-@app.get("/api/check/{code}")
-async def api_check_get(code: str, x_init_data: str = Header(None)):
-    auth_user(x_init_data or "")
-    check = checks.get(code)
-    if not check:
-        raise HTTPException(404, "Р§РµРє РЅРµ РЅР°Р№РґРµРЅ")
-    return {"check": {**check, "code": code}}
-
-
-@app.post("/api/check/{code}/activate")
-async def api_check_activate(code: str, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    check = checks.get(code)
-    if not check:
-        raise HTTPException(404, "Р§РµРє РЅРµ РЅР°Р№РґРµРЅ")
-    if check["used"]:
-        raise HTTPException(400, "Р§РµРє СѓР¶Рµ Р°РєС‚РёРІРёСЂРѕРІР°РЅ")
-    if check["creator_id"] == user["id"]:
-        raise HTTPException(400, "РќРµР»СЊР·СЏ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ С‡РµРє")
-    check["used"] = True
-    asset, amount = check["asset"], check["amount"]
-    user["balances"][asset] = user["balances"].get(asset, 0) + amount
-    tx = add_tx(user["id"], "check_in", asset, amount, comment=check.get("comment", ""))
-    _creator = users.get(check["creator_id"])
-    _creator_label = _user_label(_creator) if _creator else f"id={check['creator_id']}"
-    await notify_admin(
-        f"✅ <b>ЧЕК АКТИВИРОВАН</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Получатель: {_user_label(user)}\n"
-        f"👤 Создатель чека: {_creator_label}\n"
-        f"💎 Актив: <b>{asset}</b>\n"
-        f"💰 Сумма: <b>+{amount}</b>\n"
-        f"🔑 Полный код: <code>{code}</code>\n"
-        f"💬 Комментарий: {check.get('comment', '—')}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
-    )
-    return {"ok": True, "tx": tx, "balances": user["balances"]}
-
-
-# в”Ђв”Ђ API: СЃС‡РµС‚Р° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-@app.post("/api/invoice/create")
-async def api_invoice_create(request: Request, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    body = await request.json()
-    currency = body.get("currency", "USDT")
-    amount = float(body.get("amount", 0))
-    comment = body.get("comment", "")
-    if amount <= 0:
-        raise HTTPException(400, "РЎСѓРјРјР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ > 0")
-    inv_id = secrets.token_urlsafe(10)
-    invoices[inv_id] = {
-        "creator_id": user["id"], "amount": amount,
-        "currency": currency, "comment": comment,
-        "status": "pending", "ts": _now(),
-    }
-    _inv_msg = (
-        f"📋 <b>СОЗДАН СЧЁТ</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Выставил: {_user_label(user)}\n"
-        f"💎 Валюта: <b>{currency}</b>\n"
-        f"💰 Сумма: <b>{amount}</b>\n"
-        f"🔑 ID счёта: <code>{inv_id}</code>\n"
-    )
-    if comment:
-        _inv_msg += f"💬 Назначение: {comment}\n"
-    _inv_msg += f"⏳ Статус: ожидает оплаты"
-    await notify_admin(_inv_msg)
-    return {"ok": True, "invoice_id": inv_id, "invoice": invoices[inv_id]}
-
-
-@app.get("/api/invoice/{inv_id}")
-async def api_invoice_get(inv_id: str, x_init_data: str = Header(None)):
-    auth_user(x_init_data or "")
-    inv = invoices.get(inv_id)
-    if not inv:
-        raise HTTPException(404, "РЎС‡С‘С‚ РЅРµ РЅР°Р№РґРµРЅ")
-    return {"invoice": {**inv, "id": inv_id}}
-
-
-@app.post("/api/invoice/{inv_id}/pay")
-async def api_invoice_pay(inv_id: str, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    inv = invoices.get(inv_id)
-    if not inv:
-        raise HTTPException(404, "РЎС‡С‘С‚ РЅРµ РЅР°Р№РґРµРЅ")
-    if inv["status"] != "pending":
-        raise HTTPException(400, "РЎС‡С‘С‚ СѓР¶Рµ РѕРїР»Р°С‡РµРЅ РёР»Рё РѕС‚РјРµРЅС‘РЅ")
-    asset, amount = inv["currency"], inv["amount"]
-    if user["balances"].get(asset, 0) < amount:
-        raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
-    user["balances"][asset] -= amount
-    inv["status"] = "paid"
-    creator = users.get(inv["creator_id"])
-    if creator:
-        creator["balances"][asset] = creator["balances"].get(asset, 0) + amount
-        add_tx(inv["creator_id"], "deposit", asset, amount, comment=f"РћРїР»Р°С‚Р° СЃС‡С‘С‚Р° {inv_id[:8]}")
-    tx = add_tx(user["id"], "transfer_out", asset, amount, comment=f"РЎС‡С‘С‚ {inv_id[:8]}")
-    _creator_inv = users.get(inv["creator_id"])
-    _creator_inv_label = _user_label(_creator_inv) if _creator_inv else f"id={inv['creator_id']}"
-    await notify_admin(
-        f"💳 <b>ОПЛАТА СЧЁТА</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Плательщик: {_user_label(user)}\n"
-        f"👤 Получатель: {_creator_inv_label}\n"
-        f"💎 Актив: <b>{asset}</b>\n"
-        f"💰 Сумма: <b>{amount}</b>\n"
-        f"🔑 ID счёта: <code>{inv_id}</code>\n"
-        f"💬 Назначение: {inv.get('comment', '—')}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💼 Баланс {asset} после: <b>{user['balances'].get(asset, 0):.6f}</b>"
-    )
-    return {"ok": True, "tx": tx, "balances": user["balances"]}
-
-
 # в”Ђв”Ђ API: СЃРІРѕРї в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 @app.get("/api/swap/rate")
@@ -1736,100 +1538,6 @@ async def api_swap(request: Request, x_init_data: str = Header(None)):
         f"💼 {to_asset} после: <b>{user['balances'].get(to_asset, 0):.6f}</b>"
     )
     return {"ok": True, "received": result, "balances": user["balances"]}
-
-
-# в”Ђв”Ђ API: P2P в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-@app.get("/api/p2p/orders")
-async def api_p2p_orders(x_init_data: str = Header(None)):
-    auth_user(x_init_data or "")
-    return {"orders": [o for o in p2p_orders if o["status"] == "open"]}
-
-
-@app.post("/api/p2p/order")
-async def api_p2p_order_create(request: Request, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    body = await request.json()
-    order_type = body.get("type", "SELL")
-    asset = body.get("asset", "TON")
-    amount = float(body.get("amount", 0))
-    price = float(body.get("price", 0))
-    currency = body.get("currency", "USDT")
-    if amount <= 0 or price <= 0:
-        raise HTTPException(400, "РќРµРІРµСЂРЅР°СЏ СЃСѓРјРјР° РёР»Рё С†РµРЅР°")
-    if order_type == "SELL":
-        if user["balances"].get(asset, 0) < amount:
-            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
-        user["balances"][asset] -= amount
-    order = {
-        "id": secrets.token_urlsafe(8),
-        "creator_id": user["id"],
-        "creator_name": user.get("first_name", "User"),
-        "type": order_type, "asset": asset, "amount": amount,
-        "price": price, "currency": currency,
-        "status": "open", "ts": _now(),
-    }
-    p2p_orders.insert(0, order)
-    _total_order = round(amount * price, 8)
-    _type_ru = "ПРОДАЖА" if order_type == "SELL" else "ПОКУПКА"
-    await notify_admin(
-        f"🤝 <b>P2P ОРДЕР СОЗДАН</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Создатель: {_user_label(user)}\n"
-        f"📋 Тип: <b>{_type_ru} ({order_type})</b>\n"
-        f"💎 Актив: <b>{asset}</b>\n"
-        f"💰 Количество: <b>{amount}</b>\n"
-        f"💵 Цена за единицу: <b>{price} {currency}</b>\n"
-        f"💵 Итого: <b>{_total_order} {currency}</b>\n"
-        f"🔑 ID ордера: <code>{order['id']}</code>"
-    )
-    return {"ok": True, "order": order}
-
-
-@app.post("/api/p2p/order/{order_id}/take")
-async def api_p2p_order_take(order_id: str, x_init_data: str = Header(None)):
-    user = auth_user(x_init_data or "")
-    order = next((o for o in p2p_orders if o["id"] == order_id), None)
-    if not order:
-        raise HTTPException(404, "РћСЂРґРµСЂ РЅРµ РЅР°Р№РґРµРЅ")
-    if order["status"] != "open":
-        raise HTTPException(400, "РћСЂРґРµСЂ СѓР¶Рµ Р·Р°РєСЂС‹С‚")
-    if order["creator_id"] == user["id"]:
-        raise HTTPException(400, "РќРµР»СЊР·СЏ Р·Р°РєСЂС‹С‚СЊ СЃРѕР±СЃС‚РІРµРЅРЅС‹Р№ РѕСЂРґРµСЂ")
-    asset, currency = order["asset"], order["currency"]
-    total = round(order["amount"] * order["price"], 8)
-    if order["type"] == "SELL":
-        if user["balances"].get(currency, 0) < total:
-            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
-        user["balances"][currency] -= total
-        user["balances"][asset] = round(user["balances"].get(asset, 0) + order["amount"], 8)
-        add_tx(user["id"], "transfer_in",  asset,    order["amount"], comment=f"P2P {order_id[:6]}")
-        add_tx(user["id"], "transfer_out", currency, total,           comment=f"P2P {order_id[:6]}")
-    else:
-        if user["balances"].get(asset, 0) < order["amount"]:
-            raise HTTPException(400, "РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ")
-        user["balances"][asset] -= order["amount"]
-        user["balances"][currency] = round(user["balances"].get(currency, 0) + total, 8)
-        add_tx(user["id"], "transfer_out", asset,    order["amount"], comment=f"P2P {order_id[:6]}")
-        add_tx(user["id"], "transfer_in",  currency, total,           comment=f"P2P {order_id[:6]}")
-    order["status"] = "completed"
-    _o_creator = users.get(order["creator_id"])
-    _o_cr_label = _user_label(_o_creator) if _o_creator else f"id={order['creator_id']}"
-    _o_type_ru = "ПРОДАЖА" if order["type"] == "SELL" else "ПОКУПКА"
-    await notify_admin(
-        f"✔️ <b>P2P СДЕЛКА ЗАВЕРШЕНА</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 Исполнитель: {_user_label(user)}\n"
-        f"👤 Создатель ордера: {_o_cr_label}\n"
-        f"📋 Тип ордера: <b>{_o_type_ru}</b>\n"
-        f"💎 Актив: <b>{order['asset']}</b>\n"
-        f"💰 Количество: <b>{order['amount']}</b>\n"
-        f"💵 Итого: <b>{total} {order['currency']}</b>\n"
-        f"🔑 ID ордера: <code>{order_id}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💼 Баланс {order['asset']} после: <b>{user['balances'].get(order['asset'], 0):.6f}</b>"
-    )
-    return {"ok": True, "order": order, "balances": user["balances"]}
 
 
 # в”Ђв”Ђ QR-РєРѕРґ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
