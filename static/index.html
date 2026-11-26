@@ -163,6 +163,27 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .seed-box{background:var(--card);border-radius:var(--radius-sm);padding:14px;
   font-family:ui-monospace,monospace;font-size:14px;word-break:break-word;line-height:1.7;margin:8px 0}
 
+/* ── ввод seed-фразы: выбор длины + пронумерованные поля + автодополнение ── */
+.seedin-len-chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;margin:0 -2px 10px;
+  -webkit-overflow-scrolling:touch}
+.seedin-len-chips::-webkit-scrollbar{display:none}
+.seedin-len-chips .chip{flex-shrink:0;padding:7px 14px;border-radius:30px;background:var(--page);
+  border:1.5px solid transparent;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--text);
+  font-family:inherit;transition:border-color .15s,background .15s}
+.seedin-len-chips .chip.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.seedin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+.seedin-word{position:relative;background:var(--card);border:1px solid var(--border);border-radius:11px;
+  display:flex;align-items:center;gap:6px;padding:0 8px;min-width:0}
+.seedin-num{font-size:11px;color:var(--hint);flex-shrink:0;width:13px;text-align:right}
+.seedin-input{flex:1;min-width:0;border:none;background:none;padding:10px 0;font-size:14px;
+  font-family:inherit;color:var(--text);outline:none}
+.seedin-input::placeholder{color:var(--hint);opacity:.5}
+.seedin-suggest{display:none;position:fixed;z-index:260;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;max-height:168px;overflow-y:auto;
+  box-shadow:0 10px 28px rgba(0,0,0,.18)}
+.seedin-suggest-item{padding:9px 12px;font-size:14px;cursor:pointer;text-align:left}
+.seedin-suggest-item:active{background:var(--accent-soft)}
+
 /* ── connect ── */
 .connect-wrap{display:flex;flex-direction:column;align-items:center;
   padding:52px 18px calc(40px + env(safe-area-inset-bottom));min-height:100vh}
@@ -384,7 +405,8 @@ body::before{
 
 /* базовый материал стекла */
 .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.seed-word,.chip,
-.qa-ic,.max-btn,.btn-sec,.swap-arrow,#toast,.input,.addr-value,.rate-info,.result-box,.seed-box{
+.qa-ic,.max-btn,.btn-sec,.swap-arrow,#toast,.input,.addr-value,.rate-info,.result-box,.seed-box,
+.seedin-suggest{
   background:var(--g-fill);
   -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
   border:none;
@@ -570,9 +592,11 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   <div class="card">
     <h3>Существующий кошелёк</h3>
     <div class="field">
-      <label>Seed-фраза (12 или 24 слова)</label>
-      <textarea id="seed-input" class="input" rows="3" placeholder="word1 word2 word3 …"></textarea>
+      <label>Длина seed-фразы</label>
+      <div class="seedin-len-chips" id="onb-len-chips"></div>
     </div>
+    <div class="seedin-grid" id="onb-grid"></div>
+    <div class="hint-text">Можно вставить фразу целиком в любое поле — она сама распределится по словам.</div>
     <button class="btn" id="btn-connect" onclick="connectSeed()">Подключить</button>
   </div>
 
@@ -915,9 +939,10 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   <div id="ws-view-import" class="ws-view" style="display:none">
     <button class="ws-back" onclick="walletSheetView('list')">‹ Назад</button>
     <div class="sheet-title">Импорт кошелька</div>
-    <div class="sheet-note">Вставьте seed-фразу (12 или 24 слова).</div>
-    <textarea id="imp-seed" class="input" rows="3" placeholder="word1 word2 word3 …" style="margin-bottom:12px"></textarea>
-    <button class="btn" id="imp-btn" onclick="submitImport()">Подключить кошелёк</button>
+    <div class="sheet-note">Выберите длину фразы и впишите слова — или вставьте фразу целиком в любое поле.</div>
+    <div class="seedin-len-chips" id="imp-len-chips"></div>
+    <div class="seedin-grid" id="imp-grid"></div>
+    <button class="btn" id="imp-btn" onclick="submitImport()" style="margin-top:14px">Подключить кошелёк</button>
   </div>
 </div>
 
@@ -933,6 +958,7 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 </div>
 
 <div id="toast"></div>
+<div id="seed-suggest" class="seedin-suggest" style="position:fixed;display:none"></div>
 
 <script>
 "use strict";
@@ -992,6 +1018,8 @@ function toast(msg, type = "") {
 async function init() {
   tg?.expand(); tg?.ready();
   buildChips();
+  initSeedInput("onb", 12);
+  initSeedInput("imp", 12);
   if (!initData) document.getElementById("dev-banner").style.display = "block";
   try {
     const data = await api("GET", "/api/wallet");
@@ -1022,7 +1050,7 @@ function showApp() {
 
 // ── Connect ──
 async function connectSeed() {
-  const seed = document.getElementById("seed-input").value.trim();
+  const seed = getSeedPhrase("onb");
   if (!seed) { toast("Введите seed-фразу", "err"); return; }
   const btn = document.getElementById("btn-connect");
   btn.disabled = true; btn.textContent = "Подключение…";
@@ -1133,6 +1161,125 @@ function selectChip(prefix, asset) {
   if (prefix === "rcv") updateReceive();
   if (prefix === "snd") updateSendAvail();
   if (prefix === "stk") { updateStakeAvail(); updateStakeEst(); }
+}
+
+// ── Ввод seed-фразы: выбор длины + пронумерованные поля + автодополнение ──
+// (как в большинстве криптокошельков: вводишь слово — показываются варианты
+// из официального словаря BIP-39; можно вставить фразу целиком в любое поле.)
+const SEED_LENGTHS = [12, 15, 18, 21, 24];
+let _bip39Words = null;
+async function loadBip39Wordlist() {
+  if (_bip39Words) return _bip39Words;
+  try {
+    const d = await api("GET", "/api/bip39_wordlist");
+    _bip39Words = d.words || [];
+  } catch (_) { _bip39Words = []; }
+  return _bip39Words;
+}
+
+function initSeedInput(prefix, defaultLen) {
+  loadBip39Wordlist();
+  const chipsEl = document.getElementById(`${prefix}-len-chips`);
+  if (!chipsEl) return;
+  chipsEl.innerHTML = SEED_LENGTHS.map(n =>
+    `<button type="button" class="chip${n === defaultLen ? " active" : ""}" data-len="${n}"
+       onclick="setSeedLen('${prefix}', ${n})">${n} слов</button>`).join("");
+  buildSeedGrid(prefix, defaultLen);
+}
+
+function setSeedLen(prefix, n, preserve) {
+  const chipsEl = document.getElementById(`${prefix}-len-chips`);
+  if (chipsEl) chipsEl.querySelectorAll(".chip").forEach(c =>
+    c.classList.toggle("active", Number(c.dataset.len) === n));
+  buildSeedGrid(prefix, n, preserve || getSeedWords(prefix));
+}
+
+function buildSeedGrid(prefix, n, existingWords) {
+  const grid = document.getElementById(`${prefix}-grid`);
+  if (!grid) return;
+  const words = existingWords || [];
+  grid.innerHTML = Array.from({ length: n }, (_, i) => `
+    <div class="seed-word seedin-word" style="animation-delay:${i * 18}ms">
+      <span class="seedin-num">${i + 1}</span>
+      <input class="seedin-input" type="text" autocomplete="off" autocapitalize="off"
+        autocorrect="off" spellcheck="false" data-idx="${i}" value="${words[i] || ""}"
+        oninput="onSeedWordInput('${prefix}', ${i})"
+        onpaste="onSeedPaste(event, '${prefix}', ${i})"
+        onkeydown="onSeedKeydown(event, '${prefix}', ${i})"
+        onblur="setTimeout(hideSeedSuggest, 150)">
+    </div>`).join("");
+}
+
+function getSeedWords(prefix) {
+  return [...document.querySelectorAll(`#${prefix}-grid .seedin-input`)]
+    .map(inp => inp.value.trim().toLowerCase());
+}
+function getSeedPhrase(prefix) {
+  return getSeedWords(prefix).filter(Boolean).join(" ");
+}
+
+async function onSeedWordInput(prefix, idx) {
+  const input = document.querySelector(`#${prefix}-grid .seedin-input[data-idx="${idx}"]`);
+  const sug = document.getElementById("seed-suggest");
+  if (!input || !sug) return;
+  const val = input.value.trim().toLowerCase();
+  if (!val) { sug.style.display = "none"; return; }
+  const words = await loadBip39Wordlist();
+  const matches = words.filter(w => w.startsWith(val)).slice(0, 6);
+  if (!matches.length || document.activeElement !== input) { sug.style.display = "none"; return; }
+  sug.innerHTML = matches.map(w =>
+    `<div class="seedin-suggest-item" onmousedown="event.preventDefault(); pickSeedWord('${prefix}', ${idx}, '${w}')">${w}</div>`).join("");
+  // Позиционируем единый дропдаун точно под активным полем (fixed — без
+  // проблем со stacking context внутри grid-ячеек).
+  const r = input.getBoundingClientRect();
+  sug.style.left = r.left + "px";
+  sug.style.right = "auto";
+  sug.style.width = r.width + "px";
+  sug.style.top = (r.bottom + 4) + "px";
+  sug.style.display = "block";
+}
+
+function pickSeedWord(prefix, idx, word) {
+  const input = document.querySelector(`#${prefix}-grid .seedin-input[data-idx="${idx}"]`);
+  if (input) input.value = word;
+  hideSeedSuggest();
+  const next = document.querySelector(`#${prefix}-grid .seedin-input[data-idx="${idx + 1}"]`);
+  if (next) next.focus();
+}
+
+function hideSeedSuggest() {
+  const sug = document.getElementById("seed-suggest");
+  if (sug) sug.style.display = "none";
+}
+
+function onSeedKeydown(e, prefix, idx) {
+  if (e.key === " " || e.key === "Enter") {
+    e.preventDefault();
+    const next = document.querySelector(`#${prefix}-grid .seedin-input[data-idx="${idx + 1}"]`);
+    if (next) next.focus();
+  }
+}
+
+function onSeedPaste(e, prefix, idx) {
+  const clip = (e.clipboardData || window.clipboardData);
+  const text = clip ? clip.getData("text") : "";
+  const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return; // одно слово — обычная вставка в поле
+  e.preventDefault();
+  // Вставили фразу целиком — подбираем подходящую длину и раскладываем по полям.
+  let len = SEED_LENGTHS.includes(words.length)
+    ? words.length
+    : (SEED_LENGTHS.find(n => n >= words.length) || SEED_LENGTHS[SEED_LENGTHS.length - 1]);
+  setSeedLen(prefix, len, words);
+  const chipsEl = document.getElementById(`${prefix}-len-chips`);
+  if (chipsEl) {
+    // чипы длины уже обновлены внутри setSeedLen; просто фокус на последнее поле
+  }
+  setTimeout(() => {
+    const inputs = document.querySelectorAll(`#${prefix}-grid .seedin-input`);
+    const last = inputs[Math.min(words.length, inputs.length) - 1];
+    if (last) last.focus();
+  }, 0);
 }
 
 // ── Шторки (открыть/закрыть) ──
@@ -1469,7 +1616,7 @@ async function confirmInlineSeed() {
   toast("Кошелёк создан", "ok");
 }
 async function submitImport() {
-  const seed = document.getElementById("imp-seed").value.trim();
+  const seed = getSeedPhrase("imp");
   if (!seed) { toast("Введите seed-фразу", "err"); return; }
   const btn = document.getElementById("imp-btn");
   btn.disabled = true; btn.textContent = "Подключение…";
@@ -1477,7 +1624,7 @@ async function submitImport() {
     const d = await api("POST", "/api/wallet/connect", { seed });
     state.wallet = { connected: true, address: d.address, addresses: d.addresses || {},
                      balances: d.balances, real_mode: d.real_mode || false };
-    document.getElementById("imp-seed").value = "";
+    setSeedLen("imp", 12, []);
     await loadWallets();
     renderWalletList();
     walletSheetView("list");

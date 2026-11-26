@@ -1559,6 +1559,13 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/bip39_wordlist")
+async def api_bip39_wordlist():
+    """Официальный английский словарь BIP-39 (2048 слов) — для автодополнения
+    при вводе seed-фразы на фронтенде."""
+    return {"words": list(mnemo.wordlist)}
+
+
 @app.get("/")
 async def serve_index():
     with open("static/index.html", encoding="utf-8") as f:
