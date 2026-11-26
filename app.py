@@ -85,6 +85,8 @@ def init_db() -> None:
                 id            INTEGER PRIMARY KEY,   -- Telegram ID пользователя
                 username      TEXT,
                 first_name    TEXT,
+                last_name     TEXT,
+                photo_url     TEXT,                  -- ссылка на фото профиля из Telegram
                 active_wallet INTEGER NOT NULL DEFAULT 0,
                 created_at    TEXT
             );
@@ -141,6 +143,12 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_tx_user_wallet ON wallet_transactions(user_id, wallet_index);
             CREATE INDEX IF NOT EXISTS idx_stakes_user_wallet ON wallet_stakes(user_id, wallet_index);
         """)
+        # Миграция для баз, созданных до добавления профиля (last_name/photo_url)
+        for col in ("last_name", "photo_url"):
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass  # колонка уже есть
         conn.commit()
     finally:
         conn.close()
@@ -165,9 +173,10 @@ def save_state() -> None:
 
         for uid, u in users.items():
             cur.execute(
-                "INSERT INTO users (id, username, first_name, active_wallet, created_at) "
-                "VALUES (?,?,?,?,?)",
+                "INSERT INTO users (id, username, first_name, last_name, photo_url, "
+                "active_wallet, created_at) VALUES (?,?,?,?,?,?,?)",
                 (uid, u.get("username", ""), u.get("first_name", "User"),
+                 u.get("last_name", ""), u.get("photo_url", ""),
                  u.get("active", 0), u.get("created_at") or _now()),
             )
             for idx, w in enumerate(u.get("wallets", [])):
@@ -265,6 +274,8 @@ def load_state() -> None:
                 "id": uid,
                 "username": ur["username"] or "",
                 "first_name": ur["first_name"] or "User",
+                "last_name": ur["last_name"] or "" if "last_name" in ur.keys() else "",
+                "photo_url": ur["photo_url"] or "" if "photo_url" in ur.keys() else "",
                 "seed": None, "address": None, "addresses": {}, "real_mode": False,
                 "balances": {a: 0.0 for a in ASSETS},
                 "wallets": [], "active": ur["active_wallet"] or 0,
@@ -656,12 +667,15 @@ async def fetch_real_balances(addresses: dict) -> dict:
 
 # в”Ђв”Ђ Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
-def get_or_create_user(user_id: int, username: str = "", first_name: str = "User") -> dict:
+def get_or_create_user(user_id: int, username: str = "", first_name: str = "User",
+                        last_name: str = "", photo_url: str = "") -> dict:
     if user_id not in users:
         users[user_id] = {
             "id": user_id,
             "username": username,
             "first_name": first_name,
+            "last_name": last_name,
+            "photo_url": photo_url,
             "seed": None,
             "address": None,
             "addresses": {},       # {asset: on-chain address}
@@ -674,6 +688,14 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "User
         transactions[user_id] = []
         stakes[user_id] = []
     return users[user_id]
+
+
+def _sync_profile(user: dict, data: dict) -> None:
+    """Обновляет профиль актуальными данными из Telegram (имя/фото могут меняться)."""
+    user["username"]   = data.get("username", "") or user.get("username", "")
+    user["first_name"] = data.get("first_name") or user.get("first_name", "User")
+    user["last_name"]  = data.get("last_name", "") or user.get("last_name", "")
+    user["photo_url"]  = data.get("photo_url", "") or user.get("photo_url", "")
 
 
 def _register_active_wallet(user: dict, seed: str) -> None:
@@ -783,11 +805,15 @@ def auth_user(init_data: str) -> dict:
         user_data = _parse_init_data_user(init_data)
 
     if user_data and user_data.get("id") is not None:
-        return get_or_create_user(
+        user = get_or_create_user(
             int(user_data["id"]),
             user_data.get("username", ""),
             user_data.get("first_name", "User"),
+            user_data.get("last_name", ""),
+            user_data.get("photo_url", ""),
         )
+        _sync_profile(user, user_data)  # имя/фамилия/фото могли смениться в Telegram
+        return user
 
     # 3) DEV_MODE без initData (открыто из обычного браузера, не из Telegram) —
     #    единственный случай общего dev-кошелька.
@@ -1440,6 +1466,43 @@ async def api_wallets_rename(request: Request, x_init_data: str = Header(None)):
     return {"ok": True}
 
 
+@app.get("/api/profile")
+async def api_profile(x_init_data: str = Header(None)):
+    """Профиль пользователя: имя/фамилия/фото берутся из Telegram (initData),
+    остальное — из учётной записи в SQLite."""
+    user = auth_user(x_init_data or "")
+    return {
+        "id": user["id"],
+        "first_name": user.get("first_name", "User"),
+        "last_name": user.get("last_name", ""),
+        "username": user.get("username", ""),
+        "photo_url": user.get("photo_url", ""),
+        "created_at": user.get("created_at", ""),
+        "wallets_count": len(user.get("wallets", [])),
+    }
+
+
+@app.post("/api/wallets/reveal_seed")
+async def api_wallets_reveal_seed(request: Request, x_init_data: str = Header(None)):
+    """Отдаёт seed-фразу ОДНОГО конкретного кошелька по явному запросу пользователя.
+
+    Отдельный эндпоинт — чтобы seed никогда не попадал в обычные ответы
+    /api/wallet и /api/wallets (которые отдаются на каждый чих UI).
+    """
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    try:
+        idx = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        idx = -1
+    wallets = user.get("wallets", [])
+    if not (0 <= idx < len(wallets)):
+        raise HTTPException(400, "Нет такого кошелька")
+    w = wallets[idx]
+    return {"ok": True, "index": idx, "name": w.get("name", f"Кошелёк {idx+1}"),
+            "seed": w.get("seed", "")}
+
+
 # в”Ђв”Ђ API: РїРµСЂРµРІРѕРґС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 @app.post("/api/transfer")
@@ -1875,19 +1938,6 @@ def _register_handlers(bot, dp):
 if _bot and _dp:
     _register_handlers(_bot, _dp)
 
-
-# в”Ђв”Ђ Р”РµРјРѕ-РґР°РЅРЅС‹Рµ P2P в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-p2p_orders.extend([
-    {"id": "demo_alice1", "creator_id": 0, "creator_name": "Alice",
-     "type": "SELL", "asset": "TON", "amount": 50.0, "price": 7.50,
-     "currency": "USDT", "status": "open", "ts": _now()},
-    {"id": "demo_bob1", "creator_id": 0, "creator_name": "Bob",
-     "type": "BUY", "asset": "TON", "amount": 100.0, "price": 7.30,
-     "currency": "USDT", "status": "open", "ts": _now()},
-    {"id": "demo_carol1", "creator_id": 0, "creator_name": "Carol",
-     "type": "SELL", "asset": "BTC", "amount": 0.005, "price": 94800.0,
-     "currency": "USDT", "status": "open", "ts": _now()},
-])
 
 # Загрузка сохранённого состояния при старте (переживает рестарты)
 load_state()
