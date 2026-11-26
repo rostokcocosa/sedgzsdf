@@ -1,4 +1,4 @@
-# DeFi Wallet Mini App — локальный тестовый стенд
+# Kelta Wallet Mini App — локальный тестовый стенд
 
 Telegram-бот + Telegram Mini App на базе FastAPI, aiogram v3, BIP-39.
 
