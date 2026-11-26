@@ -483,9 +483,11 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 /* нажатия на строки */
 .wallet-row:active,.asset:active{transform:scale(.985)}
 
-/* 6 вкладок — чуть компактнее */
-.bottom-nav .nav-item{font-size:10px;padding-left:0;padding-right:0}
-.bottom-nav .nav-item span{white-space:nowrap}
+/* 6 вкладок — компактнее за счёт отступов и иконок, но текст ≥11px */
+.bottom-nav{gap:0;padding-left:2px;padding-right:2px}
+.bottom-nav .nav-item{font-size:11px;padding-left:0;padding-right:0;gap:2px}
+.bottom-nav .nav-item span{white-space:nowrap;letter-spacing:-.2px}
+.bottom-nav .nav-item svg{width:21px;height:21px}
 
 /* стейкинг */
 .stake-row{padding:14px 0;border-bottom:1px solid var(--border)}
