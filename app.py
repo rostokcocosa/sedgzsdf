@@ -56,6 +56,50 @@ checks: dict[str, dict] = {}
 invoices: dict[str, dict] = {}
 p2p_orders: list[dict] = []
 
+# в”Ђв”Ђ Persistence (JSON-файл, переживает рестарты) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# На Railway задайте DATA_FILE=/data/wallet_data.json и примонтируйте Volume на /data,
+# иначе файл очищается при каждом редеплое.
+DATA_FILE = os.environ.get("DATA_FILE", "wallet_data.json")
+
+def save_state() -> None:
+    try:
+        payload = {
+            "users": users,
+            "checks": checks,
+            "invoices": invoices,
+            "p2p_orders": [o for o in p2p_orders if not str(o.get("id", "")).startswith("demo_")],
+        }
+        tmp = DATA_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, default=str)
+        os.replace(tmp, DATA_FILE)
+    except Exception as e:
+        print(f"[PERSIST] save: {e}")
+
+def load_state() -> None:
+    try:
+        if not os.path.exists(DATA_FILE):
+            print("[PERSIST] файл состояния не найден — старт с чистого состояния")
+            return
+        with open(DATA_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        for k, v in (data.get("users") or {}).items():
+            users[int(k)] = v
+        checks.update(data.get("checks") or {})
+        invoices.update(data.get("invoices") or {})
+        existing = {o.get("id") for o in p2p_orders}
+        for o in (data.get("p2p_orders") or []):
+            if o.get("id") not in existing:
+                p2p_orders.append(o)
+        # пере-связать transactions с txs активного кошелька
+        for uid, u in users.items():
+            ws = u.get("wallets", [])
+            act = u.get("active", 0)
+            transactions[uid] = ws[act].setdefault("txs", []) if ws and 0 <= act < len(ws) else []
+        print(f"[PERSIST] загружено: users={len(users)}, checks={len(checks)}, invoices={len(invoices)}")
+    except Exception as e:
+        print(f"[PERSIST] load: {e}")
+
 ASSETS = ["TON", "USDT", "ETH", "BNB", "BTC", "TRX"]
 TEST_RATES: dict[tuple, float] = {
     ("TON",  "USDT"): 7.50,       ("USDT", "TON"):  1 / 7.50,
@@ -556,6 +600,18 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def _persist_middleware(request: Request, call_next):
+    """После каждого изменяющего POST-запроса сохраняем состояние на диск."""
+    response = await call_next(request)
+    try:
+        if request.method == "POST" and request.url.path.startswith("/api/"):
+            save_state()
+    except Exception as e:
+        print(f"[PERSIST] middleware: {e}")
+    return response
+
+
 # в”Ђв”Ђ API: Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёСЏ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 @app.post("/api/auth")
@@ -902,16 +958,85 @@ async def _trx_onchain(addr: str) -> list:
     return out
 
 
+BSCSCAN_API_KEY = os.environ.get("BSCSCAN_API_KEY", "")
+
+
+async def _evm_scan(base: str, addr: str, action: str, asset: str, decimals: int,
+                    api_key: str = "", contract: str = "") -> list:
+    """Универсальный парсер Etherscan-совместимого эксплорера (Blockscout/BscScan)."""
+    out = []
+    if not addr:
+        return out
+    try:
+        async with aiohttp.ClientSession() as sess:
+            params = {"module": "account", "action": action, "address": addr,
+                      "sort": "desc", "page": "1", "offset": "25"}
+            if contract:
+                params["contractaddress"] = contract
+            if api_key:
+                params["apikey"] = api_key
+            q = "&".join(f"{k}={v}" for k, v in params.items())
+            async with sess.get(f"{base}?{q}", timeout=aiohttp.ClientTimeout(total=12)) as r:
+                data = await r.json()
+                rows = data.get("result")
+                if not isinstance(rows, list):
+                    return out
+                for t in rows[:25]:
+                    if contract and t.get("contractAddress", "").lower() != contract.lower():
+                        continue
+                    dec = int(t.get("tokenDecimal") or decimals)
+                    try:
+                        val = int(t.get("value", "0")) / (10 ** dec)
+                    except Exception:
+                        continue
+                    if val <= 0:
+                        continue
+                    is_in = (t.get("to", "") or "").lower() == addr.lower()
+                    out.append({"type": "transfer_in" if is_in else "transfer_out", "asset": asset,
+                                "amount": val, "address": (t.get("from") if is_in else t.get("to")) or "",
+                                "comment": "", "status": "completed", "ts": _iso_s(t.get("timeStamp", 0))})
+    except Exception as e:
+        print(f"[ONCHAIN-EVM] {asset}: {e}")
+    return out
+
+
+async def _eth_onchain(addr: str) -> list:
+    return await _evm_scan("https://eth.blockscout.com/api", addr, "txlist", "ETH", 18)
+
+async def _erc20_usdt_onchain(addr: str) -> list:
+    return await _evm_scan("https://eth.blockscout.com/api", addr, "tokentx", "USDT", 6,
+                           contract=USDT_ERC20_CONTRACT)
+
+async def _bsc_onchain(addr: str) -> list:
+    if not BSCSCAN_API_KEY:
+        return []
+    return await _evm_scan("https://api.bscscan.com/api", addr, "txlist", "BNB", 18,
+                           api_key=BSCSCAN_API_KEY)
+
+
 async def fetch_onchain_history(asset: str, addrs: dict) -> list:
     if asset == "TON":
         return await _ton_onchain(addrs.get("TON", ""))
     if asset == "BTC":
         return await _btc_onchain(addrs.get("BTC", ""))
-    if asset == "USDT":
-        return await _tron_trc20_onchain(addrs.get("TRON", ""))
+    if asset == "ETH":
+        return await _eth_onchain(addrs.get("ETH", ""))
+    if asset == "BNB":
+        return await _bsc_onchain(addrs.get("BNB") or addrs.get("ETH", ""))
     if asset == "TRX":
         return await _trx_onchain(addrs.get("TRON", ""))
-    return []  # ETH/BNB: нужен API-ключ эксплорера — пока не реализовано
+    if asset == "USDT":
+        tron, erc = await asyncio.gather(
+            _tron_trc20_onchain(addrs.get("TRON", "")),
+            _erc20_usdt_onchain(addrs.get("ETH", "")),
+            return_exceptions=True,
+        )
+        res = []
+        for part in (tron, erc):
+            if isinstance(part, list):
+                res.extend(part)
+        return res
+    return []
 
 
 @app.get("/api/wallet/onchain")
@@ -925,7 +1050,26 @@ async def api_wallet_onchain(asset: str, x_init_data: str = Header(None)):
         return {"history": txs, "onchain": False}
     txs = await fetch_onchain_history(asset, user.get("addresses", {}))
     txs.sort(key=lambda t: t.get("ts", ""), reverse=True)
-    return {"history": txs, "onchain": True, "supported": asset in ("TON", "BTC", "USDT", "TRX")}
+    supported = asset != "BNB" or bool(BSCSCAN_API_KEY)
+    return {"history": txs, "onchain": True, "supported": supported}
+
+
+@app.get("/api/wallet/onchain_all")
+async def api_wallet_onchain_all(x_init_data: str = Header(None)):
+    """Последние операции по ВСЕМ монетам (из независимых обозревателей)."""
+    user = auth_user(x_init_data or "")
+    if not user.get("real_mode") or not BLOCKCHAIN_AVAILABLE:
+        return {"history": transactions.get(user["id"], []), "onchain": False}
+    addrs = user.get("addresses", {})
+    results = await asyncio.gather(
+        *[fetch_onchain_history(a, addrs) for a in ASSETS], return_exceptions=True
+    )
+    merged = []
+    for r in results:
+        if isinstance(r, list):
+            merged.extend(r)
+    merged.sort(key=lambda t: t.get("ts", ""), reverse=True)
+    return {"history": merged[:40], "onchain": True}
 
 
 # в”Ђв”Ђ Мультикошелёк в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -1432,6 +1576,9 @@ p2p_orders.extend([
      "type": "SELL", "asset": "BTC", "amount": 0.005, "price": 94800.0,
      "currency": "USDT", "status": "open", "ts": _now()},
 ])
+
+# Загрузка сохранённого состояния при старте (переживает рестарты)
+load_state()
 
 
 # в”Ђв”Ђ РўРѕС‡РєР° РІС…РѕРґР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
