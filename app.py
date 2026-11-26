@@ -1582,65 +1582,151 @@ _bot, _dp = _make_bot()
 
 
 def _register_handlers(bot, dp):
+    from aiogram import F, types
     from aiogram.filters import Command
-    from aiogram import types
-    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-    def webapp_kb():
+    APP_NAME = "DeFi Wallet"
+
+    def _webapp_button() -> Optional[InlineKeyboardButton]:
         if not WEBAPP_URL.startswith("https://"):
             return None
-        return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🚀 Открыть DeFi Wallet", web_app=WebAppInfo(url=WEBAPP_URL))
-        ]])
+        return InlineKeyboardButton(text="🚀 Открыть кошелёк", web_app=WebAppInfo(url=WEBAPP_URL))
+
+    def main_menu_kb() -> InlineKeyboardMarkup:
+        """Главное меню бота — как в обычных криптоботах: приложение + быстрые действия."""
+        rows = []
+        wb = _webapp_button()
+        if wb:
+            rows.append([wb])
+        rows.append([
+            InlineKeyboardButton(text="💰 Баланс", callback_data="menu:balance"),
+            InlineKeyboardButton(text="🔐 Кошелёк", callback_data="menu:wallet"),
+        ])
+        rows.append([InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help")])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    def back_kb() -> InlineKeyboardMarkup:
+        rows = []
+        wb = _webapp_button()
+        if wb:
+            rows.append([wb])
+        rows.append([InlineKeyboardButton(text="◀️ В меню", callback_data="menu:home")])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    def welcome_text(first_name: str) -> str:
+        return (
+            f"👋 Добро пожаловать, <b>{first_name}</b>!\n\n"
+            f"<b>{APP_NAME}</b> — некастодиальный крипто-кошелёк прямо в Telegram. "
+            f"Вы сами создаёте кошелёк и управляете доступом к нему — seed-фраза "
+            f"хранится только у вас.\n\n"
+            f"<b>Что умеет бот:</b>\n"
+            f"💎 TON · ₿ BTC · ⟠ ETH · 🔶 BNB · 🔺 TRX · 💵 USDT\n"
+            f"📤 Отправка и приём по адресу или QR-коду\n"
+            f"🔄 Обмен между активами\n"
+            f"📈 Стейкинг с доходностью\n\n"
+            f"Откройте приложение, чтобы создать или подключить кошелёк 👇"
+        )
+
+    def help_text() -> str:
+        return (
+            f"<b>❓ Помощь · {APP_NAME}</b>\n\n"
+            f"<b>Команды:</b>\n"
+            f"/start — приветствие и главное меню\n"
+            f"/menu — открыть меню\n"
+            f"/status — баланс кошелька\n"
+            f"/seed — показать seed-фразу (никому её не передавайте)\n"
+            f"/help — эта справка\n\n"
+            f"Все операции — отправка, приём, обмен, стейкинг — выполняются "
+            f"в Mini App по кнопке «🚀 Открыть кошелёк»."
+        )
+
+    def wallet_info_text(user: dict) -> str:
+        if not user.get("seed"):
+            return "❌ Кошелёк ещё не подключён.\nОткройте приложение, чтобы создать или импортировать кошелёк."
+        mode = "🌐 Реальный блокчейн" if user.get("real_mode") else "🧪 Тестовый режим"
+        addr = user.get("address") or "—"
+        wallets_n = len(user.get("wallets", [])) or 1
+        return (
+            f"🔐 <b>Ваш кошелёк</b>\n\n"
+            f"Режим: {mode}\n"
+            f"TON-адрес: <code>{addr}</code>\n"
+            f"Кошельков на аккаунте: <b>{wallets_n}</b>\n\n"
+            f"Seed-фразу и остальные адреса смотрите в приложении → профиль."
+        )
+
+    def balance_text(user: dict) -> str:
+        if not user.get("seed"):
+            return "❌ Кошелёк не подключён.\nОткройте приложение, чтобы начать."
+        bal = user["balances"]
+        mode = "🌐 Реальный" if user.get("real_mode") else "🧪 Тест"
+        return (
+            f"💼 <b>Баланс</b> ({mode})\n\n"
+            f"💎 TON:  <b>{bal.get('TON', 0):.4f}</b>\n"
+            f"💵 USDT: <b>{bal.get('USDT', 0):.2f}</b>\n"
+            f"⟠ ETH:  <b>{bal.get('ETH', 0):.6f}</b>\n"
+            f"🔶 BNB:  <b>{bal.get('BNB', 0):.4f}</b>\n"
+            f"₿ BTC:  <b>{bal.get('BTC', 0):.8f}</b>\n"
+            f"🔺 TRX:  <b>{bal.get('TRX', 0):.4f}</b>"
+        )
 
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
-        _u_start = get_or_create_user(message.from_user.id, message.from_user.username or "",
-                                       message.from_user.first_name or "")
-        await notify_admin(
-            f"👤 <b>НОВЫЙ ПОЛЬЗОВАТЕЛЬ</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Имя: <b>{message.from_user.first_name}</b>\n"
-            f"Username: @{message.from_user.username or '—'}\n"
-            f"Telegram ID: <code>{message.from_user.id}</code>\n"
-            f"Команда: /start"
-        )
-        await message.answer(
-            f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"
-            "Добро пожаловать в <b>DeFi Wallet</b>.\n\n"
-            "/start — это сообщение\n/seed — seed-фраза\n/status — баланс\n\n"
-            "Или открой Mini App:",
-            parse_mode="HTML", reply_markup=webapp_kb())
+        is_new = message.from_user.id not in users
+        get_or_create_user(message.from_user.id, message.from_user.username or "",
+                            message.from_user.first_name or "")
+        if is_new:
+            await notify_admin(
+                f"👤 <b>НОВЫЙ ПОЛЬЗОВАТЕЛЬ</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"Имя: <b>{message.from_user.first_name}</b>\n"
+                f"Username: @{message.from_user.username or '—'}\n"
+                f"Telegram ID: <code>{message.from_user.id}</code>"
+            )
+        await message.answer(welcome_text(message.from_user.first_name or "друг"),
+                              parse_mode="HTML", reply_markup=main_menu_kb())
+
+    @dp.message(Command("menu"))
+    async def cmd_menu(message: types.Message):
+        await message.answer(f"<b>{APP_NAME}</b> · главное меню",
+                              parse_mode="HTML", reply_markup=main_menu_kb())
+
+    @dp.message(Command("help"))
+    async def cmd_help(message: types.Message):
+        await message.answer(help_text(), parse_mode="HTML", reply_markup=back_kb())
 
     @dp.message(Command("seed"))
     async def cmd_seed(message: types.Message):
         user = get_or_create_user(message.from_user.id)
-        if user["seed"]:
-            mode = "🌐 Реальный блокчейн" if user.get("real_mode") else "🧪 Тестовый режим"
-            await message.answer(
-                f"🔐 Кошелёк подключён ({mode}).\n"
-                f"Адрес: <code>{user['address']}</code>",
-                parse_mode="HTML", reply_markup=webapp_kb())
-        else:
-            await message.answer("❌ Кошелёк не подключён.", reply_markup=webapp_kb())
+        await message.answer(wallet_info_text(user), parse_mode="HTML", reply_markup=back_kb())
 
     @dp.message(Command("status"))
     async def cmd_status(message: types.Message):
         user = get_or_create_user(message.from_user.id)
-        if not user["seed"]:
-            await message.answer("❌ Кошелёк не подключён.", reply_markup=webapp_kb())
-            return
-        bal = user["balances"]
-        mode = "🌐 Реальный" if user.get("real_mode") else "🧪 Тест"
-        await message.answer(
-            f"💼 <b>Кошелёк</b> ({mode})\n\n"
-            f"TON-адрес: <code>{user['address'][:20]}…</code>\n\n"
-            f"💠 TON:  <b>{bal['TON']:.4f}</b>\n"
-            f"💵 USDT: <b>{bal['USDT']:.2f}</b>\n"
-            f"₿ BTC:  <b>{bal['BTC']:.8f}</b>\n"
-            f"⦾ ETH:  <b>{bal['ETH']:.6f}</b>\n"
-            f"🟡 BNB:  <b>{bal['BNB']:.4f}</b>",
-            parse_mode="HTML", reply_markup=webapp_kb())
+        await message.answer(balance_text(user), parse_mode="HTML", reply_markup=back_kb())
+
+    @dp.callback_query(F.data == "menu:home")
+    async def cb_home(cq: CallbackQuery):
+        await cq.message.edit_text(f"<b>{APP_NAME}</b> · главное меню",
+                                    parse_mode="HTML", reply_markup=main_menu_kb())
+        await cq.answer()
+
+    @dp.callback_query(F.data == "menu:balance")
+    async def cb_balance(cq: CallbackQuery):
+        user = get_or_create_user(cq.from_user.id)
+        await cq.message.edit_text(balance_text(user), parse_mode="HTML", reply_markup=back_kb())
+        await cq.answer()
+
+    @dp.callback_query(F.data == "menu:wallet")
+    async def cb_wallet(cq: CallbackQuery):
+        user = get_or_create_user(cq.from_user.id)
+        await cq.message.edit_text(wallet_info_text(user), parse_mode="HTML", reply_markup=back_kb())
+        await cq.answer()
+
+    @dp.callback_query(F.data == "menu:help")
+    async def cb_help(cq: CallbackQuery):
+        await cq.message.edit_text(help_text(), parse_mode="HTML", reply_markup=back_kb())
+        await cq.answer()
 
 
 if _bot and _dp:
@@ -1661,11 +1747,43 @@ async def _configure_bot(bot) -> None:
     from aiogram.types import (
         BotCommand, MenuButtonWebApp, MenuButtonCommands, WebAppInfo,
     )
+
+    # Имя, описание и «о боте» — чтобы профиль бота в Telegram выглядел
+    # как у обычного серьёзного крипто-бота, а не как тестовая заготовка.
+    # Каждый вызов в своём try/except: сбой одного не должен ронять остальные.
+    try:
+        await bot.set_my_name(name="DeFi Wallet")
+    except Exception as e:
+        print(f"[BOT][WARN] set_my_name: {e}")
+    try:
+        await bot.set_my_description(
+            description=(
+                "DeFi Wallet — некастодиальный крипто-кошелёк прямо в Telegram: "
+                "TON, Bitcoin, Ethereum, BNB, TRON и USDT.\n\n"
+                "• Создайте или импортируйте кошелёк за секунду — seed-фраза остаётся у вас\n"
+                "• Отправляйте и принимайте крипту по адресу или QR-коду\n"
+                "• Обменивайте активы между сетями\n"
+                "• Получайте доход на стейкинге\n\n"
+                "Нажмите /start, чтобы начать."
+            )
+        )
+    except Exception as e:
+        print(f"[BOT][WARN] set_my_description: {e}")
+    try:
+        await bot.set_my_short_description(
+            short_description="Крипто-кошелёк в Telegram: TON, BTC, ETH, BNB, TRON, USDT. "
+                               "Отправка, приём, обмен и стейкинг."
+        )
+    except Exception as e:
+        print(f"[BOT][WARN] set_my_short_description: {e}")
+
     try:
         await bot.set_my_commands([
-            BotCommand(command="start",  description="Запуск / открыть кошелёк"),
-            BotCommand(command="seed",   description="Показать seed-фразу"),
-            BotCommand(command="status", description="Показать баланс"),
+            BotCommand(command="start",  description="Главное меню"),
+            BotCommand(command="menu",   description="Открыть меню"),
+            BotCommand(command="status", description="Баланс кошелька"),
+            BotCommand(command="seed",   description="Инфо о кошельке"),
+            BotCommand(command="help",   description="Помощь"),
         ])
         if WEBAPP_URL.startswith("https://"):
             await bot.set_chat_menu_button(
