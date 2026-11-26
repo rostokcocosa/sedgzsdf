@@ -13,14 +13,13 @@
   --page:        var(--tg-theme-secondary-bg-color,  #eef1f4);
   --card:        var(--tg-theme-bg-color,            #ffffff);
   --text:        var(--tg-theme-text-color,          #0d1620);
-  --hint:        var(--tg-theme-hint-color,          #8a9098);
+  --hint:        var(--tg-theme-hint-color,          #6e7681);
   --link:        var(--tg-theme-link-color,          #2990ff);
   --border:      color-mix(in srgb, var(--text) 9%, transparent);
   --green:#2fb171; --green-soft:rgba(47,177,113,.14);
   --red:#e5484d;   --red-soft:rgba(229,72,77,.14);
   --yellow:#f3a81b;--yellow-soft:rgba(243,168,27,.16);
   --radius:18px; --radius-sm:13px;
-  --coin-TON:#0098ea; --coin-USDT:#26a17b; --coin-ETH:#627eea; --coin-BNB:#f3ba2f; --coin-BTC:#f7931a;
 }
 @media (prefers-color-scheme:dark){
   :root{
@@ -93,22 +92,26 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .hero-label{font-size:13px;color:var(--hint);font-weight:500;margin-bottom:6px}
 .hero-total{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:1.05}
-.hero-sub{margin-top:8px;min-height:20px}
+.hero-sub{margin-top:8px;min-height:22px;display:flex;align-items:center;justify-content:center;gap:10px}
 #mode-badge{font-size:11.5px;padding:3px 10px;border-radius:20px;background:var(--accent-soft);
   color:var(--accent);font-weight:600;display:none}
-.qa-row{display:flex;justify-content:center;gap:10px;margin-top:20px}
-.qa{flex:1;max-width:84px;background:none;border:none;cursor:pointer;color:var(--text);
+#btn-refresh{display:none;align-items:center;gap:4px;background:none;border:none;color:var(--hint);
+  font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit}
+.qa-row{display:flex;justify-content:center;gap:16px;margin-top:20px}
+.qa{flex:0 0 auto;width:92px;background:none;border:none;cursor:pointer;color:var(--text);
   display:flex;flex-direction:column;align-items:center;gap:7px;font-family:inherit;
-  font-size:12px;font-weight:500;transition:transform .12s}
+  font-size:12.5px;font-weight:500;transition:transform .12s}
 .qa:active{transform:scale(.93)}
-.qa-ic{width:52px;height:52px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+.qa-ic{width:54px;height:54px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
   display:flex;align-items:center;justify-content:center}
 .qa-ic svg{width:23px;height:23px}
 
 /* ── asset list ── */
-.assets{padding:6px 16px}
-.asset{display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:1px solid var(--border)}
+.assets{padding:4px 16px}
+.asset{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:opacity .12s}
 .asset:last-child{border-bottom:none}
+.asset:active{opacity:.55}
 .coin{width:42px;height:42px;border-radius:50%;flex-shrink:0;overflow:hidden;background:var(--page)}
 .coin img{width:100%;height:100%;display:block;object-fit:cover}
 .asset-main{flex:1;min-width:0}
@@ -117,24 +120,15 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .asset-right{text-align:right}
 .asset-amt{font-size:16px;font-weight:600}
 .asset-fiat{font-size:13px;color:var(--hint)}
-
-/* ── address card ── */
-.addr-block{margin-top:10px}
-.addr-block:first-child{margin-top:0}
-.addr-label{font-size:12px;color:var(--hint);margin-bottom:3px;display:flex;align-items:center;gap:6px}
-.addr-value{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;word-break:break-all;
-  background:var(--page);border-radius:10px;padding:10px 12px;position:relative}
-.addr-copy{background:var(--accent-soft);border:none;color:var(--accent);padding:5px 12px;
-  border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:7px;font-family:inherit}
-.addr-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.addr-tools .btn-sm{flex:1;min-width:auto}
+.asset-chev{color:var(--hint);flex-shrink:0;opacity:.6;margin-left:-4px}
+.asset-chev svg{width:18px;height:18px;display:block}
 
 /* ── history ── */
 .tx-list{display:flex;flex-direction:column}
 .tx-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
 .tx-item:last-child{border-bottom:none}
 .tx-icon{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:17px;flex-shrink:0}
+  justify-content:center;flex-shrink:0}
 .tx-icon svg{width:18px;height:18px}
 .tx-icon.in {background:var(--green-soft);color:var(--green)}
 .tx-icon.out{background:var(--red-soft);color:var(--red)}
@@ -146,6 +140,9 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .tx-amt.in {color:var(--green)}
 .tx-amt.out{color:var(--red)}
 .empty{color:var(--hint);font-size:14px;text-align:center;padding:22px 10px}
+.link-row{text-align:center;margin-top:4px}
+.link-btn{background:none;border:none;color:var(--accent);font-size:14px;font-weight:500;
+  cursor:pointer;font-family:inherit;padding:8px}
 
 /* ── badges ── */
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
@@ -163,13 +160,13 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .seed-box{background:var(--card);border-radius:var(--radius-sm);padding:14px;
   font-family:ui-monospace,monospace;font-size:14px;word-break:break-word;line-height:1.7;margin:8px 0}
 
-/* ── connect / onboarding ── */
+/* ── connect ── */
 .connect-wrap{display:flex;flex-direction:column;align-items:center;
   padding:52px 18px calc(40px + env(safe-area-inset-bottom));min-height:100vh}
 .connect-logo{width:84px;height:84px;border-radius:24px;display:flex;align-items:center;
-  justify-content:center;font-size:44px;margin-bottom:18px;
+  justify-content:center;margin-bottom:18px;
   background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#8b5cf6));
-  box-shadow:0 10px 30px var(--accent-soft)}
+  box-shadow:0 6px 16px rgba(0,0,0,.14)}
 .connect-title{font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
 .connect-hint{color:var(--hint);text-align:center;margin-bottom:26px;font-size:14.5px;max-width:300px}
 .connect-wrap .card{width:100%;max-width:420px}
@@ -177,16 +174,53 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   width:100%;max-width:420px}
 .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
 
-/* ── modal ── */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;
-  display:none;align-items:center;justify-content:center;padding:20px;
-  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-.modal-overlay.open{display:flex;animation:fade .2s ease}
-.modal-box{background:var(--card);border-radius:22px;padding:24px;width:100%;max-width:300px;text-align:center}
-.modal-box h3{margin-bottom:16px;font-size:16px;font-weight:600}
-.modal-box img{border-radius:14px;background:#fff;padding:10px;width:208px;height:208px;margin:0 auto}
-.modal-addr{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--hint);
-  word-break:break-all;margin:12px 0}
+/* ── bottom sheet ── */
+.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:249;opacity:0;visibility:hidden;
+  transition:opacity .25s;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.sheet-backdrop.open{opacity:1;visibility:visible}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:250;background:var(--card);
+  border-radius:24px 24px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1);
+  max-height:92vh;overflow-y:auto}
+.sheet.open{transform:none}
+.sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--border);margin:4px auto 14px}
+.sheet-title{font-size:19px;font-weight:700;margin-bottom:4px}
+.sheet-note{font-size:13px;color:var(--hint);margin-bottom:14px}
+
+/* ── coin chips ── */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;margin:0 -2px;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 14px 7px 7px;border-radius:30px;
+  background:var(--page);border:1.5px solid transparent;cursor:pointer;font-weight:600;font-size:14px;
+  color:var(--text);font-family:inherit;transition:border-color .15s,background .15s}
+.chip img{width:24px;height:24px;border-radius:50%}
+.chip.active{border-color:var(--accent);background:var(--accent-soft)}
+
+/* ── receive QR ── */
+.qr-wrap{text-align:center}
+.qr-wrap img{width:210px;height:210px;border-radius:16px;background:#fff;padding:12px;margin:4px auto 14px}
+.addr-value{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;word-break:break-all;
+  background:var(--page);border-radius:12px;padding:13px 14px;line-height:1.5}
+.amount-row{display:flex;align-items:center;gap:8px}
+.amount-row .input{flex:1}
+.max-btn{flex-shrink:0;background:var(--accent-soft);color:var(--accent);border:none;border-radius:11px;
+  padding:13px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.avail{font-size:12.5px;color:var(--hint);margin-top:6px}
+
+/* ── asset detail screen ── */
+.asset-screen{position:fixed;inset:0;z-index:240;background:var(--page);overflow-y:auto;
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.3,1);visibility:hidden}
+.asset-screen.open{transform:none;visibility:visible}
+.as-head{display:flex;align-items:center;gap:6px;padding:14px 10px;position:sticky;top:0;z-index:2;
+  background:color-mix(in srgb,var(--page) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.as-back{background:none;border:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;padding:6px}
+.as-back svg{width:26px;height:26px}
+.as-head-title{font-size:17px;font-weight:600}
+.as-top{text-align:center;padding:8px 16px 20px}
+.as-top .coin{width:64px;height:64px;margin:0 auto 12px}
+.as-amt{font-size:30px;font-weight:800;letter-spacing:-1px}
+.as-fiat{font-size:15px;color:var(--hint);margin-top:2px}
+.as-actions{display:flex;justify-content:center;gap:16px;margin-top:18px}
 
 /* ── misc ── */
 .order-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
@@ -195,8 +229,9 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 .order-info{font-size:13.5px;color:var(--hint);margin-bottom:8px}
 .order-price{font-size:17px;font-weight:700}
 .swap-arrow{display:flex;align-items:center;justify-content:center;width:40px;height:40px;margin:-6px auto;
-  border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:20px;cursor:pointer;
+  border-radius:50%;background:var(--accent-soft);color:var(--accent);cursor:pointer;
   border:3px solid var(--card);position:relative;z-index:2;user-select:none}
+.swap-arrow svg{width:18px;height:18px}
 .rate-info{background:var(--page);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--hint);
   margin-top:10px;text-align:center}
 .rate-table{display:flex;flex-direction:column}
@@ -213,7 +248,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 /* ── toast ── */
 #toast{position:fixed;bottom:calc(86px + env(safe-area-inset-bottom));left:50%;
   transform:translateX(-50%) translateY(16px);background:#1c1f24;color:#fff;padding:11px 20px;
-  border-radius:22px;font-size:14px;opacity:0;transition:all .3s cubic-bezier(.2,.9,.3,1);z-index:300;
+  border-radius:22px;font-size:14px;opacity:0;transition:all .3s cubic-bezier(.2,.9,.3,1);z-index:320;
   white-space:nowrap;pointer-events:none;max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.ok {background:var(--green)}
@@ -222,6 +257,9 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 /* ── dev banner ── */
 #dev-banner,#dev-banner-app{background:var(--yellow-soft);border-radius:12px;
   padding:11px 14px;font-size:12.5px;color:var(--yellow);margin-bottom:14px;text-align:center;font-weight:500}
+#dev-banner-app{display:none;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+#dev-banner-app button{background:var(--yellow);color:#fff;border:none;border-radius:9px;padding:7px 12px;
+  font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -280,19 +318,28 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   <!-- Вкладка: Кошелёк -->
   <div id="tab-wallet" class="tab-content" style="display:block">
   <div class="page">
-    <div id="dev-banner-app" style="display:none">Режим разработки (DEV_MODE=true)</div>
+    <div id="dev-banner-app">
+      <span>Режим разработки</span>
+      <button onclick="openDepositSheet()">Начислить тест</button>
+    </div>
 
     <!-- Общий баланс + действия -->
     <div class="hero">
       <div class="hero-label">Общий баланс</div>
       <div class="hero-total" id="hero-total">$0.00</div>
-      <div class="hero-sub"><span id="mode-badge"></span></div>
-      <div class="qa-row">
-        <button class="qa" onclick="openDeposit()">
-          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
-          <span>Пополнить</span>
+      <div class="hero-sub">
+        <span id="mode-badge"></span>
+        <button id="btn-refresh" onclick="refreshBalances()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+          <span>Обновить</span>
         </button>
-        <button class="qa" onclick="openWithdraw()">
+      </div>
+      <div class="qa-row">
+        <button class="qa" onclick="openReceive()">
+          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
+          <span>Получить</span>
+        </button>
+        <button class="qa" onclick="openSend()">
           <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
           <span>Отправить</span>
         </button>
@@ -300,114 +347,19 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
           <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg></span>
           <span>Обмен</span>
         </button>
-        <button class="qa" onclick="showQR()">
-          <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01"/></svg></span>
-          <span>Получить</span>
-        </button>
       </div>
     </div>
 
     <!-- Активы -->
     <div class="sec-title">Активы</div>
-    <div class="assets card">
-      <div class="asset">
-        <div class="coin"><img src="/static/coins/ton.svg" alt="TON"></div>
-        <div class="asset-main"><div class="asset-name">Toncoin</div><div class="asset-sub">TON</div></div>
-        <div class="asset-right"><div class="asset-amt" id="b-TON">0</div><div class="asset-fiat" id="bf-TON">$0.00</div></div>
-      </div>
-      <div class="asset">
-        <div class="coin"><img src="/static/coins/usdt.svg" alt="USDT"></div>
-        <div class="asset-main"><div class="asset-name">Tether</div><div class="asset-sub">USDT</div></div>
-        <div class="asset-right"><div class="asset-amt" id="b-USDT">0</div><div class="asset-fiat" id="bf-USDT">$0.00</div></div>
-      </div>
-      <div class="asset">
-        <div class="coin"><img src="/static/coins/eth.svg" alt="ETH"></div>
-        <div class="asset-main"><div class="asset-name">Ethereum</div><div class="asset-sub">ETH</div></div>
-        <div class="asset-right"><div class="asset-amt" id="b-ETH">0</div><div class="asset-fiat" id="bf-ETH">$0.00</div></div>
-      </div>
-      <div class="asset">
-        <div class="coin"><img src="/static/coins/bnb.svg" alt="BNB"></div>
-        <div class="asset-main"><div class="asset-name">BNB</div><div class="asset-sub">BNB</div></div>
-        <div class="asset-right"><div class="asset-amt" id="b-BNB">0</div><div class="asset-fiat" id="bf-BNB">$0.00</div></div>
-      </div>
-      <div class="asset">
-        <div class="coin"><img src="/static/coins/btc.svg" alt="BTC"></div>
-        <div class="asset-main"><div class="asset-name">Bitcoin</div><div class="asset-sub">BTC</div></div>
-        <div class="asset-right"><div class="asset-amt" id="b-BTC">0</div><div class="asset-fiat" id="bf-BTC">$0.00</div></div>
-      </div>
+    <div class="assets card" id="assets-list"></div>
+
+    <div class="link-row">
+      <button class="link-btn" onclick="openOverride()">Указать адреса вручную</button>
     </div>
 
-    <!-- Deposit form -->
-    <div id="deposit-form" class="card" style="display:none">
-      <h3>Тестовое пополнение</h3>
-      <div class="field"><label>Актив</label>
-        <select id="dep-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
-      <div class="field"><label>Сумма</label>
-        <input id="dep-amount" class="input" type="number" min="0.001" step="any" value="10" placeholder="Сумма"></div>
-      <div class="row-btns">
-        <button class="btn btn-green" onclick="doDeposit()">Зачислить</button>
-        <button class="btn btn-sec" onclick="closeDeposit()">Отмена</button>
-      </div>
-    </div>
-
-    <!-- Withdraw form -->
-    <div id="withdraw-form" class="card" style="display:none">
-      <h3>Вывод средств</h3>
-      <div class="field"><label>Актив</label>
-        <select id="wd-asset" class="input"><option>TON</option><option>USDT</option><option>ETH</option><option>BNB</option><option>BTC</option></select></div>
-      <div class="field"><label>Адрес получателя</label>
-        <input id="wd-addr" class="input" placeholder="EQ…"></div>
-      <div class="field"><label>Сумма</label>
-        <input id="wd-amount" class="input" type="number" min="0.001" step="any" placeholder="Сумма"></div>
-      <div class="row-btns">
-        <button class="btn btn-danger" onclick="doWithdraw()">Вывести</button>
-        <button class="btn btn-sec" onclick="closeWithdraw()">Отмена</button>
-      </div>
-    </div>
-
-    <!-- Адреса -->
-    <div class="sec-title">Адреса кошелька</div>
-    <div class="card">
-      <div class="addr-block">
-        <div class="addr-label">TON</div>
-        <div class="addr-value" id="hdr-addr">—</div>
-        <button class="addr-copy" onclick="copyAddr()">Копировать</button>
-      </div>
-      <div class="addr-block" id="eth-addr-row" style="display:none">
-        <div class="addr-label">ETH / BNB (EVM)</div>
-        <div class="addr-value" id="hdr-eth-addr">—</div>
-        <button class="addr-copy" onclick="copyEthAddr()">Копировать</button>
-      </div>
-      <div class="addr-block" id="btc-addr-row" style="display:none">
-        <div class="addr-label">BTC (SegWit)</div>
-        <div class="addr-value" id="hdr-btc-addr">—</div>
-        <button class="addr-copy" onclick="copyBtcAddr()">Копировать</button>
-      </div>
-      <div class="addr-tools">
-        <button class="btn btn-sec btn-sm" onclick="showQR()">QR-код</button>
-        <button class="btn btn-sec btn-sm" id="btn-refresh" onclick="refreshBalances()" style="display:none">Обновить</button>
-        <button class="btn btn-sec btn-sm" onclick="toggleAddrOverride()">Ввести вручную</button>
-      </div>
-    </div>
-
-    <!-- Форма ручного ввода адреса -->
-    <div id="addr-override" class="card" style="display:none">
-      <h3>Ввести адрес вручную</h3>
-      <p class="hint-text">Если деривация адреса не совпала с вашим кошельком — введите адрес сюда, балансы обновятся.</p>
-      <div class="field"><label>TON адрес</label>
-        <input id="ov-ton" class="input" placeholder="EQ…"></div>
-      <div class="field"><label>EVM адрес (ETH / BNB)</label>
-        <input id="ov-eth" class="input" placeholder="0x…"></div>
-      <div class="field"><label>BTC адрес (native SegWit)</label>
-        <input id="ov-btc" class="input" placeholder="bc1q…"></div>
-      <div class="row-btns">
-        <button class="btn" onclick="applyAddrOverride()">Применить</button>
-        <button class="btn btn-sec" onclick="toggleAddrOverride()">Отмена</button>
-      </div>
-    </div>
-
-    <!-- История -->
-    <div class="sec-title">История операций</div>
+    <!-- Последние операции -->
+    <div class="sec-title">Последние операции</div>
     <div class="card">
       <div id="tx-list" class="tx-list"><div class="empty">Нет операций</div></div>
     </div>
@@ -498,7 +450,7 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
           <input id="sw-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00" oninput="updateRate()">
         </div>
       </div>
-      <div class="swap-arrow" onclick="swapAssets()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v16M8 20l-3-3M8 4l3 3M16 20V4M16 4l3 3M16 20l-3-3"/></svg></div>
+      <div class="swap-arrow" onclick="swapAssets()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v16M8 20l-3-3M8 4l3 3M16 20V4M16 4l3 3M16 20l-3-3"/></svg></div>
       <div class="field" style="margin-bottom:0"><label>Получаете</label>
         <div style="display:flex;gap:8px">
           <select id="sw-to" class="input" style="width:118px;flex-shrink:0" onchange="updateRate()">
@@ -580,15 +532,90 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   </nav>
 </div>
 
-<!-- QR Modal -->
-<div id="qr-modal" class="modal-overlay" onclick="closeQR()">
-  <div class="modal-box" onclick="event.stopPropagation()">
-    <h3>Адрес для пополнения</h3>
-    <img id="qr-img" src="" alt="QR">
-    <div class="modal-addr" id="qr-addr"></div>
-    <button class="btn btn-sec btn-sm" onclick="copyAddr();closeQR()">Скопировать адрес</button>
-    <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="closeQR()">Закрыть</button>
+<!-- ══ Экран актива ══ -->
+<div id="asset-screen" class="asset-screen">
+  <div class="as-head">
+    <button class="as-back" onclick="closeAsset()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <span class="as-head-title" id="as-head-title">Актив</span>
   </div>
+  <div class="as-top">
+    <div class="coin"><img id="as-logo" src="/static/coins/ton.svg" alt=""></div>
+    <div class="as-amt" id="as-amt">0</div>
+    <div class="as-fiat" id="as-fiat">$0.00</div>
+    <div class="as-actions">
+      <button class="qa" onclick="openReceive(_assetOpen)">
+        <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>
+        <span>Получить</span>
+      </button>
+      <button class="qa" onclick="openSend(_assetOpen)">
+        <span class="qa-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+        <span>Отправить</span>
+      </button>
+    </div>
+  </div>
+  <div class="page" style="padding-top:0">
+    <div class="sec-title">Операции</div>
+    <div class="card">
+      <div id="as-tx" class="tx-list"><div class="empty">Нет операций</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Шторки ══ -->
+<div id="sheet-backdrop" class="sheet-backdrop" onclick="closeSheets()"></div>
+
+<!-- Получить -->
+<div id="receive-sheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Получить</div>
+  <div class="sheet-note">Выберите монету и отправьте средства на адрес ниже.</div>
+  <div class="chips" id="rcv-chips"></div>
+  <div class="qr-wrap">
+    <img id="rcv-img" src="/static/coins/ton.svg" alt="QR" style="display:none">
+    <div class="sheet-note" id="rcv-net" style="margin-bottom:8px"></div>
+    <div class="addr-value" id="rcv-addr">—</div>
+    <button class="btn btn-sec" style="margin-top:12px" onclick="copyReceive()">Скопировать адрес</button>
+  </div>
+</div>
+
+<!-- Отправить -->
+<div id="send-sheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Отправить</div>
+  <div class="sheet-note">Выберите монету, укажите адрес и сумму.</div>
+  <div class="chips" id="snd-chips"></div>
+  <div class="field"><label>Адрес получателя</label>
+    <input id="snd-addr" class="input" placeholder="Адрес кошелька получателя"></div>
+  <div class="field" style="margin-bottom:6px"><label>Сумма</label>
+    <div class="amount-row">
+      <input id="snd-amount" class="input" type="number" min="0.001" step="any" placeholder="0.00">
+      <button class="max-btn" onclick="sendMax()">Макс</button>
+    </div>
+    <div class="avail" id="snd-avail"></div>
+  </div>
+  <button class="btn" style="margin-top:14px" onclick="doSend()">Отправить</button>
+</div>
+
+<!-- Тестовое пополнение (dev) -->
+<div id="deposit-sheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Тестовое пополнение</div>
+  <div class="sheet-note">Доступно только в режиме разработки.</div>
+  <div class="chips" id="dep-chips"></div>
+  <div class="field"><label>Сумма</label>
+    <input id="dep-amount" class="input" type="number" min="0.001" step="any" value="10" placeholder="Сумма"></div>
+  <button class="btn btn-green" style="margin-top:8px" onclick="doDeposit()">Зачислить</button>
+</div>
+
+<!-- Адреса вручную -->
+<div id="override-sheet" class="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Адреса вручную</div>
+  <div class="sheet-note">Если деривация адреса не совпала с вашим кошельком — укажите адрес, балансы обновятся.</div>
+  <div class="field"><label>TON адрес</label><input id="ov-ton" class="input" placeholder="EQ…"></div>
+  <div class="field"><label>EVM адрес (ETH / BNB)</label><input id="ov-eth" class="input" placeholder="0x…"></div>
+  <div class="field"><label>BTC адрес (native SegWit)</label><input id="ov-btc" class="input" placeholder="bc1q…"></div>
+  <button class="btn" style="margin-top:8px" onclick="applyAddrOverride()">Применить</button>
 </div>
 
 <div id="toast"></div>
@@ -597,42 +624,37 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
 "use strict";
 const tg = window.Telegram?.WebApp;
 const initData = tg?.initData || "";
-
-// Когда HTML открыт как file://, запросы к /api/... идут на localhost:8000
 const BASE_URL = window.location.protocol === "file:" ? "http://localhost:8000" : "";
 
-// Тестовые курсы к USD — для подсчёта фиат-эквивалента и общего баланса
 const RATES = { TON: 7.5, USDT: 1, ETH: 3200, BNB: 600, BTC: 95000 };
 const ASSET_LIST = ["TON", "USDT", "ETH", "BNB", "BTC"];
+const COIN_META = {
+  TON:  { name:"Toncoin",  img:"ton.svg",  net:"Сеть TON" },
+  USDT: { name:"Tether",   img:"usdt.svg", net:"Сеть TON (Jetton)" },
+  ETH:  { name:"Ethereum", img:"eth.svg",  net:"Сеть Ethereum (ERC-20)" },
+  BNB:  { name:"BNB",      img:"bnb.svg",  net:"Сеть BNB Smart Chain" },
+  BTC:  { name:"Bitcoin",  img:"btc.svg",  net:"Сеть Bitcoin" },
+};
+// какой адрес показывать для каждой монеты
+const ADDR_KEY = { TON:"TON", USDT:"TON", ETH:"ETH", BNB:"ETH", BTC:"BTC" };
 
 const state = {
-  wallet: null,
-  newSeed: null,
-  activeTab: "wallet",
-  currentInvoice: null,
-  realMode: false,
-  addresses: {},
+  wallet: null, newSeed: null, activeTab: "wallet",
+  currentInvoice: null, realMode: false, addresses: {},
 };
 
-// ── API ──────────────────────────────────────────────────────────────────────
+// ── API ──
 async function api(method, path, body = null) {
-  const opts = {
-    method,
-    headers: { "Content-Type": "application/json", "X-Init-Data": initData },
-  };
+  const opts = { method, headers: { "Content-Type": "application/json", "X-Init-Data": initData } };
   if (body !== null) opts.body = JSON.stringify(body);
   let res;
-  try {
-    res = await fetch(BASE_URL + path, opts);
-  } catch (_) {
-    throw new Error("Сервер недоступен — запустите: python app.py");
-  }
+  try { res = await fetch(BASE_URL + path, opts); }
+  catch (_) { throw new Error("Сервер недоступен — запустите: python app.py"); }
   const data = await res.json().catch(() => ({ detail: "Ошибка ответа сервера" }));
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   return data;
 }
 
-// ── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type = "") {
   const el = document.getElementById("toast");
   el.textContent = msg;
@@ -641,30 +663,18 @@ function toast(msg, type = "") {
   el._t = setTimeout(() => el.className = "", 3000);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──
 async function init() {
-  tg?.expand();
-  tg?.ready();
-
-  if (!initData) {
-    document.getElementById("dev-banner").style.display = "block";
-  }
-
+  tg?.expand(); tg?.ready();
+  buildChips();
+  if (!initData) document.getElementById("dev-banner").style.display = "block";
   try {
     const data = await api("GET", "/api/wallet");
     state.wallet = data;
-    if (data.connected) {
-      showApp();
-    } else {
-      showScreen("connect");
-    }
-  } catch (e) {
-    showScreen("connect");
-    toast(e.message, "err");
-  }
+    data.connected ? showApp() : showScreen("connect");
+  } catch (e) { showScreen("connect"); toast(e.message, "err"); }
 }
 
-// ── Screens ──────────────────────────────────────────────────────────────────
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById("screen-" + name).classList.add("active");
@@ -673,44 +683,19 @@ function showScreen(name) {
 function showApp() {
   showScreen("app");
   const w = state.wallet;
-  updateBalances(w.balances);
-  document.getElementById("hdr-addr").textContent = w.address || "—";
-
-  // Реальный режим
   state.realMode  = w.real_mode || false;
   state.addresses = w.addresses || {};
+  if (state.addresses.TON == null && w.address) state.addresses.TON = w.address;
+  updateBalances(w.balances);
   const badge = document.getElementById("mode-badge");
-  if (state.realMode) {
-    badge.textContent = "Реальный блокчейн";
-    badge.style.display = "inline-block";
-    document.getElementById("btn-refresh").style.display = "inline-block";
-  } else {
-    badge.textContent = "Тестовый режим";
-    badge.style.display = "inline-block";
-    document.getElementById("btn-refresh").style.display = "none";
-  }
-
-  // ETH адрес
-  const ethAddr = state.addresses.ETH || "";
-  if (ethAddr) {
-    document.getElementById("hdr-eth-addr").textContent = ethAddr;
-    document.getElementById("eth-addr-row").style.display = "block";
-  }
-  // BTC адрес
-  const btcAddr = state.addresses.BTC || "";
-  if (btcAddr) {
-    document.getElementById("hdr-btc-addr").textContent = btcAddr;
-    document.getElementById("btc-addr-row").style.display = "block";
-  }
-
-  if (!initData) {
-    document.getElementById("dev-banner-app").style.display = "block";
-  }
-  loadHistory();
-  loadP2P();
+  badge.textContent = state.realMode ? "Реальный блокчейн" : "Тестовый режим";
+  badge.style.display = "inline-block";
+  document.getElementById("btn-refresh").style.display = state.realMode ? "inline-flex" : "none";
+  if (!initData) document.getElementById("dev-banner-app").style.display = "flex";
+  loadHistory(); loadP2P();
 }
 
-// ── Connect ──────────────────────────────────────────────────────────────────
+// ── Connect ──
 async function connectSeed() {
   const seed = document.getElementById("seed-input").value.trim();
   if (!seed) { toast("Введите seed-фразу", "err"); return; }
@@ -718,230 +703,283 @@ async function connectSeed() {
   btn.disabled = true; btn.textContent = "Подключение…";
   try {
     const data = await api("POST", "/api/wallet/connect", { seed });
-    state.wallet = {
-      connected: true,
-      address:   data.address,
-      addresses: data.addresses || {},
-      balances:  data.balances,
-      real_mode: data.real_mode || false,
-    };
-    state.newSeed = null;
-    showApp();
-    if (data.real_mode) {
-      toast("Реальные балансы загружены с блокчейна", "ok");
-    } else {
-      toast("Кошелёк подключён (тест-режим)", "ok");
-    }
-  } catch (e) {
-    toast(e.message, "err");
-  } finally {
-    btn.disabled = false; btn.textContent = "Подключить";
-  }
+    state.wallet = { connected:true, address:data.address, addresses:data.addresses||{},
+                     balances:data.balances, real_mode:data.real_mode||false };
+    state.newSeed = null; showApp();
+    toast(data.real_mode ? "Реальные балансы загружены" : "Кошелёк подключён (тест-режим)", "ok");
+  } catch (e) { toast(e.message, "err"); }
+  finally { btn.disabled = false; btn.textContent = "Подключить"; }
 }
 
 async function requestGenerate() {
   try {
     const data = await api("POST", "/api/wallet/connect", { seed: "generate" });
     state.newSeed = data.seed;
-    state.wallet = {
-      connected: true, address: data.address,
-      addresses: data.addresses || {}, balances: data.balances,
-      real_mode: false,
-    };
-    renderSeedScreen(data.seed);
-    showScreen("newseed");
-  } catch (e) {
-    toast(e.message, "err");
-  }
+    state.wallet = { connected:true, address:data.address, addresses:data.addresses||{},
+                     balances:data.balances, real_mode:false };
+    renderSeedScreen(data.seed); showScreen("newseed");
+  } catch (e) { toast(e.message, "err"); }
 }
 
 function renderSeedScreen(seed) {
   const words = seed.split(" ");
-  const grid = document.getElementById("seed-words-grid");
-  grid.innerHTML = words.map((w, i) =>
-    `<div class="seed-word"><span>${i+1}</span><b>${w}</b></div>`
-  ).join("");
+  document.getElementById("seed-words-grid").innerHTML =
+    words.map((w, i) => `<div class="seed-word"><span>${i+1}</span><b>${w}</b></div>`).join("");
   document.getElementById("seed-full").textContent = seed;
 }
+function copySeed() { if (state.newSeed) copyToClipboard(state.newSeed); }
+function confirmNewSeed() { showApp(); toast("Кошелёк создан", "ok"); }
 
-function copySeed() {
-  if (state.newSeed) copyToClipboard(state.newSeed);
-}
-
-function confirmNewSeed() {
-  showApp();
-  toast("Кошелёк создан", "ok");
-}
-
-// ── Balances ─────────────────────────────────────────────────────────────────
+// ── Balances / assets ──
 function updateBalances(bal) {
   if (!bal) return;
-  let total = 0;
-  for (const a of ASSET_LIST) {
-    const amt = Number(bal[a] || 0);
-    const amtEl  = document.getElementById("b-" + a);
-    const fiatEl = document.getElementById("bf-" + a);
-    if (amtEl)  amtEl.textContent  = fmtAmt(amt, a);
-    const usd = amt * (RATES[a] || 0);
-    if (fiatEl) fiatEl.textContent = fmtUsd(usd);
-    total += usd;
-  }
-  const totalEl = document.getElementById("hero-total");
-  if (totalEl) totalEl.textContent = fmtUsd(total);
   if (state.wallet) state.wallet.balances = bal;
+  renderAssets(bal);
+  let total = 0;
+  for (const a of ASSET_LIST) total += Number(bal[a] || 0) * (RATES[a] || 0);
+  document.getElementById("hero-total").textContent = fmtUsd(total);
+  if (_assetOpen) renderAssetDetail(_assetOpen);
+}
+
+function renderAssets(bal) {
+  const el = document.getElementById("assets-list");
+  el.innerHTML = ASSET_LIST.map(a => {
+    const amt = Number(bal[a] || 0), usd = amt * (RATES[a] || 0), m = COIN_META[a];
+    return `<div class="asset" onclick="openAsset('${a}')">
+      <div class="coin"><img src="/static/coins/${m.img}" alt="${a}"></div>
+      <div class="asset-main"><div class="asset-name">${m.name}</div><div class="asset-sub">${a}</div></div>
+      <div class="asset-right"><div class="asset-amt">${fmtAmt(amt,a)}</div><div class="asset-fiat">${fmtUsd(usd)}</div></div>
+      <div class="asset-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+    </div>`;
+  }).join("");
 }
 
 function fmtAmt(n, asset) {
-  if (asset === "USDT") return Number(n).toFixed(2);
-  if (asset === "BTC")  return Number(n).toFixed(6);
-  if (asset === "ETH")  return Number(n).toFixed(6);
-  if (asset === "BNB")  return Number(n).toFixed(4);
-  return Number(n).toFixed(4);
+  n = Number(n);
+  if (asset === "USDT") return n.toFixed(2);
+  if (asset === "BTC" || asset === "ETH") return n.toFixed(6);
+  if (asset === "BNB") return n.toFixed(4);
+  return n.toFixed(4);
 }
-
 function fmtUsd(n) {
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function fmtDate(ts) {
-  const d = new Date(ts);  // ISO 8601 with +00:00 offset is valid; don't append Z
+  const d = new Date(ts);
   return d.toLocaleDateString("ru") + " " + d.toLocaleTimeString("ru", {hour:"2-digit",minute:"2-digit"});
 }
 
-// ── Tab switch ───────────────────────────────────────────────────────────────
+// ── Tabs ──
 function switchTab(tab) {
   state.activeTab = tab;
-  document.querySelectorAll(".nav-item").forEach(el =>
-    el.classList.toggle("active", el.dataset.tab === tab));
-  document.querySelectorAll(".tab-content").forEach(el =>
-    el.style.display = el.id === "tab-" + tab ? "block" : "none");
+  document.querySelectorAll(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+  document.querySelectorAll(".tab-content").forEach(el => el.style.display = el.id === "tab-" + tab ? "block" : "none");
   window.scrollTo(0, 0);
   if (tab === "p2p") loadP2P();
   if (tab === "wallet") loadHistory();
 }
 
-// ── Wallet: Deposit / Withdraw ────────────────────────────────────────────────
-function openDeposit()  { const f=document.getElementById("deposit-form"); f.style.display="block"; f.scrollIntoView({behavior:"smooth",block:"center"}); }
-function closeDeposit() { document.getElementById("deposit-form").style.display = "none"; }
-function openWithdraw() { const f=document.getElementById("withdraw-form"); f.style.display="block"; f.scrollIntoView({behavior:"smooth",block:"center"}); }
-function closeWithdraw(){ document.getElementById("withdraw-form").style.display = "none"; }
+// ── адрес монеты ──
+function coinAddress(asset) {
+  const key = ADDR_KEY[asset] || "TON";
+  if (key === "TON") return state.addresses.TON || state.wallet?.address || "";
+  return state.addresses[key] || "";
+}
 
+// ── чипы выбора монеты ──
+function buildChips() {
+  const html = (prefix) => ASSET_LIST.map((a,i) =>
+    `<button class="chip${i===0?' active':''}" data-coin="${a}" onclick="selectChip('${prefix}','${a}')">
+       <img src="/static/coins/${COIN_META[a].img}" alt="${a}"><span>${a}</span></button>`).join("");
+  document.getElementById("rcv-chips").innerHTML = html("rcv");
+  document.getElementById("snd-chips").innerHTML = html("snd");
+  document.getElementById("dep-chips").innerHTML = html("dep");
+}
+const _coin = { rcv:"TON", snd:"TON", dep:"TON" };
+function selectChip(prefix, asset) {
+  _coin[prefix] = asset;
+  document.querySelectorAll(`#${prefix}-chips .chip`).forEach(c =>
+    c.classList.toggle("active", c.dataset.coin === asset));
+  if (prefix === "rcv") updateReceive();
+  if (prefix === "snd") updateSendAvail();
+}
+
+// ── Шторки (открыть/закрыть) ──
+function openSheet(id) {
+  document.getElementById("sheet-backdrop").classList.add("open");
+  document.getElementById(id).classList.add("open");
+}
+function closeSheets() {
+  document.getElementById("sheet-backdrop").classList.remove("open");
+  document.querySelectorAll(".sheet").forEach(s => s.classList.remove("open"));
+}
+
+// ── Получить ──
+let _rcvAddr = "";
+function openReceive(preset) {
+  selectChip("rcv", preset && ASSET_LIST.includes(preset) ? preset : _coin.rcv);
+  updateReceive();
+  openSheet("receive-sheet");
+}
+function updateReceive() {
+  const coin = _coin.rcv, addr = coinAddress(coin);
+  _rcvAddr = addr;
+  document.getElementById("rcv-net").textContent = COIN_META[coin].net;
+  document.getElementById("rcv-addr").textContent = addr || "Адрес недоступен — укажите вручную";
+  const img = document.getElementById("rcv-img");
+  if (addr) { img.src = `${BASE_URL}/api/qr/${encodeURIComponent(addr)}`; img.style.display = ""; }
+  else img.style.display = "none";
+}
+function copyReceive() { if (_rcvAddr) copyToClipboard(_rcvAddr); else toast("Адрес недоступен", "err"); }
+
+// ── Отправить ──
+function openSend(preset) {
+  selectChip("snd", preset && ASSET_LIST.includes(preset) ? preset : _coin.snd);
+  document.getElementById("snd-addr").value = "";
+  document.getElementById("snd-amount").value = "";
+  updateSendAvail();
+  openSheet("send-sheet");
+}
+function updateSendAvail() {
+  const coin = _coin.snd, bal = Number(state.wallet?.balances?.[coin] || 0);
+  document.getElementById("snd-avail").textContent = `Доступно: ${fmtAmt(bal, coin)} ${coin}`;
+}
+function sendMax() {
+  const coin = _coin.snd, bal = Number(state.wallet?.balances?.[coin] || 0);
+  document.getElementById("snd-amount").value = bal > 0 ? bal : "";
+}
+async function doSend() {
+  const asset = _coin.snd;
+  const address = document.getElementById("snd-addr").value.trim();
+  const amount = parseFloat(document.getElementById("snd-amount").value);
+  if (!address) { toast("Введите адрес получателя", "err"); return; }
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/wallet/withdraw", { asset, amount, address });
+    updateBalances(d.balances); closeSheets();
+    toast(`Отправлено ${fmtAmt(amount, asset)} ${asset}`, "ok");
+    loadHistory();
+    if (_assetOpen) loadAssetHistory(_assetOpen);
+  } catch (e) { toast(e.message, "err"); }
+}
+
+// ── Тестовое пополнение (dev) ──
+function openDepositSheet() { selectChip("dep", _coin.dep); openSheet("deposit-sheet"); }
 async function doDeposit() {
-  const asset  = document.getElementById("dep-asset").value;
-  const amount = parseFloat(document.getElementById("dep-amount").value);
+  const asset = _coin.dep, amount = parseFloat(document.getElementById("dep-amount").value);
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   try {
     const d = await api("POST", "/api/wallet/deposit", { asset, amount });
-    updateBalances(d.balances); closeDeposit();
-    toast(`+${fmtAmt(amount, asset)} ${asset} зачислено`, "ok");
+    updateBalances(d.balances); closeSheets();
+    toast(`Начислено ${fmtAmt(amount, asset)} ${asset}`, "ok");
     loadHistory();
+    if (_assetOpen) loadAssetHistory(_assetOpen);
   } catch (e) { toast(e.message, "err"); }
 }
 
-async function doWithdraw() {
-  const asset  = document.getElementById("wd-asset").value;
-  const amount = parseFloat(document.getElementById("wd-amount").value);
-  const address = document.getElementById("wd-addr").value.trim();
-  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
-  if (!address) { toast("Введите адрес", "err"); return; }
+// ── Адреса вручную ──
+function openOverride() {
+  document.getElementById("ov-ton").value = state.addresses.TON || "";
+  document.getElementById("ov-eth").value = state.addresses.ETH || "";
+  document.getElementById("ov-btc").value = state.addresses.BTC || "";
+  openSheet("override-sheet");
+}
+async function applyAddrOverride() {
+  const tonAddr = document.getElementById("ov-ton").value.trim();
+  const ethAddr = document.getElementById("ov-eth").value.trim();
+  const btcAddr = document.getElementById("ov-btc").value.trim();
   try {
-    const d = await api("POST", "/api/wallet/withdraw", { asset, amount, address });
-    updateBalances(d.balances); closeWithdraw();
-    document.getElementById("wd-addr").value = "";
-    document.getElementById("wd-amount").value = "";
-    toast(`${fmtAmt(amount, asset)} ${asset} отправлено`, "ok");
-    loadHistory();
+    if (tonAddr) { const d = await api("POST","/api/wallet/set_address",{asset:"TON",address:tonAddr});
+      state.addresses.TON = tonAddr; state.wallet.address = tonAddr; updateBalances(d.balances); }
+    if (ethAddr) { const d = await api("POST","/api/wallet/set_address",{asset:"ETH",address:ethAddr});
+      state.addresses.ETH = ethAddr; updateBalances(d.balances); }
+    if (btcAddr) { const d = await api("POST","/api/wallet/set_address",{asset:"BTC",address:btcAddr});
+      state.addresses.BTC = btcAddr; updateBalances(d.balances); }
+    closeSheets(); toast("Адреса обновлены", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
 
-// ── History ──────────────────────────────────────────────────────────────────
+// ── Экран актива ──
+let _assetOpen = null;
+function openAsset(asset) {
+  _assetOpen = asset;
+  renderAssetDetail(asset);
+  document.getElementById("as-tx").innerHTML = `<div class="empty">Загрузка…</div>`;
+  document.getElementById("asset-screen").classList.add("open");
+  loadAssetHistory(asset);
+}
+function closeAsset() {
+  document.getElementById("asset-screen").classList.remove("open");
+  _assetOpen = null;
+}
+function renderAssetDetail(asset) {
+  const m = COIN_META[asset], bal = Number(state.wallet?.balances?.[asset] || 0);
+  document.getElementById("as-head-title").textContent = m.name;
+  document.getElementById("as-logo").src = `/static/coins/${m.img}`;
+  document.getElementById("as-amt").textContent = `${fmtAmt(bal, asset)} ${asset}`;
+  document.getElementById("as-fiat").textContent = fmtUsd(bal * (RATES[asset] || 0));
+}
+async function loadAssetHistory(asset) {
+  try { const d = await api("GET", "/api/wallet/history"); renderAssetHistory(d.history, asset); }
+  catch (_) {}
+}
+function renderAssetHistory(list, asset) {
+  const el = document.getElementById("as-tx");
+  const f = (list || []).filter(t => t.asset === asset);
+  el.innerHTML = f.length ? f.slice(0, 50).map(txRow).join("")
+    : `<div class="empty">Нет операций по ${asset}</div>`;
+}
+
+// ── История ──
 async function loadHistory() {
-  try {
-    const d = await api("GET", "/api/wallet/history");
-    renderHistory(d.history);
-  } catch (_) {}
+  try { const d = await api("GET", "/api/wallet/history"); renderHistory(d.history); }
+  catch (_) {}
 }
-
-const TX_LABEL = {
-  deposit:      "Пополнение",
-  withdraw:     "Вывод",
-  transfer_out: "Перевод",
-  transfer_in:  "Получено",
-  swap:         "Своп",
-  check_in:     "Получен чек",
-  check_out:    "Создан чек",
-};
-const TX_DIR = {
-  deposit:"in", transfer_in:"in", check_in:"in",
-  withdraw:"out", transfer_out:"out", check_out:"out",
-  swap:"swap",
-};
+const TX_LABEL = { deposit:"Пополнение", withdraw:"Вывод", transfer_out:"Перевод",
+  transfer_in:"Получено", swap:"Обмен", check_in:"Получен чек", check_out:"Создан чек" };
+const TX_DIR = { deposit:"in", transfer_in:"in", check_in:"in",
+  withdraw:"out", transfer_out:"out", check_out:"out", swap:"swap" };
 const TX_SVG = {
   in:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
   out:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
 };
-
+function txRow(tx) {
+  const dir = TX_DIR[tx.type] || "out";
+  const sign = dir === "in" ? "+" : dir === "out" ? "−" : "±";
+  const lbl = TX_LABEL[tx.type] || tx.type;
+  const sub = tx.comment || (tx.address ? tx.address.slice(0,20)+"…" : fmtDate(tx.ts));
+  return `<div class="tx-item">
+    <div class="tx-icon ${dir}">${TX_SVG[dir] || TX_SVG.out}</div>
+    <div class="tx-info"><div class="tx-label">${lbl}</div><div class="tx-sub">${sub}</div></div>
+    <div class="tx-amt ${dir}">${sign}${fmtAmt(tx.amount, tx.asset)} ${tx.asset}</div>
+  </div>`;
+}
 function renderHistory(list) {
   const el = document.getElementById("tx-list");
-  if (!list || !list.length) {
-    el.innerHTML = `<div class="empty">Нет операций</div>`;
-    return;
-  }
-  el.innerHTML = list.slice(0, 30).map(tx => {
-    const dir = TX_DIR[tx.type] || "out";
-    const sign = dir === "in" ? "+" : dir === "out" ? "−" : "±";
-    const cls  = dir === "in" ? "in" : dir === "out" ? "out" : "swap";
-    const lbl  = TX_LABEL[tx.type] || tx.type;
-    const sub  = tx.comment || (tx.address ? tx.address.slice(0,20)+"…" : fmtDate(tx.ts));
-    return `<div class="tx-item">
-      <div class="tx-icon ${cls}">${TX_SVG[cls]||TX_SVG.out}</div>
-      <div class="tx-info">
-        <div class="tx-label">${lbl}</div>
-        <div class="tx-sub">${sub}</div>
-      </div>
-      <div class="tx-amt ${cls}">${sign}${fmtAmt(tx.amount, tx.asset)} ${tx.asset}</div>
-    </div>`;
-  }).join("");
+  el.innerHTML = (list && list.length) ? list.slice(0, 20).map(txRow).join("")
+    : `<div class="empty">Нет операций</div>`;
 }
 
-// ── QR modal ─────────────────────────────────────────────────────────────────
-function showQR() {
-  const addr = state.wallet?.address;
-  if (!addr) return;
-  document.getElementById("qr-img").src  = `${BASE_URL}/api/qr/${encodeURIComponent(addr)}`;
-  document.getElementById("qr-addr").textContent = addr;
-  document.getElementById("qr-modal").classList.add("open");
-}
-function closeQR() { document.getElementById("qr-modal").classList.remove("open"); }
-
-function copyAddr() {
-  const addr = state.wallet?.address;
-  if (addr) copyToClipboard(addr);
-}
-
-// ── Transfer ─────────────────────────────────────────────────────────────────
+// ── Transfer / Checks / Invoice / Swap / P2P ──
 async function doTransfer() {
-  const asset   = document.getElementById("tr-asset").value;
+  const asset = document.getElementById("tr-asset").value;
   const address = document.getElementById("tr-addr").value.trim();
-  const amount  = parseFloat(document.getElementById("tr-amount").value);
+  const amount = parseFloat(document.getElementById("tr-amount").value);
   const comment = document.getElementById("tr-comment").value.trim();
   if (!address) { toast("Введите адрес получателя", "err"); return; }
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   try {
     const d = await api("POST", "/api/transfer", { asset, address, amount, comment });
     updateBalances(d.balances);
-    document.getElementById("tr-addr").value = "";
-    document.getElementById("tr-amount").value = "";
+    document.getElementById("tr-addr").value = ""; document.getElementById("tr-amount").value = "";
     document.getElementById("tr-comment").value = "";
     toast(`Переведено ${fmtAmt(amount, asset)} ${asset}`, "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-
-// ── Checks ───────────────────────────────────────────────────────────────────
 async function createCheck() {
-  const asset   = document.getElementById("ch-asset").value;
-  const amount  = parseFloat(document.getElementById("ch-amount").value);
+  const asset = document.getElementById("ch-asset").value;
+  const amount = parseFloat(document.getElementById("ch-amount").value);
   const comment = document.getElementById("ch-comment").value.trim();
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   try {
@@ -949,17 +987,14 @@ async function createCheck() {
     document.getElementById("check-code").textContent = d.code;
     document.getElementById("check-result").style.display = "block";
     document.getElementById("ch-amount").value = "";
-    const wd = await api("GET", "/api/wallet");
-    updateBalances(wd.balances);
+    const wd = await api("GET", "/api/wallet"); updateBalances(wd.balances);
     toast("Чек создан", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-
 function copyCheckCode() {
   const code = document.getElementById("check-code").textContent;
   if (code) copyToClipboard(code);
 }
-
 async function activateCheck() {
   const code = document.getElementById("act-code").value.trim();
   if (!code) { toast("Введите код чека", "err"); return; }
@@ -967,20 +1002,16 @@ async function activateCheck() {
     const d = await api("POST", `/api/check/${encodeURIComponent(code)}/activate`);
     updateBalances(d.balances);
     document.getElementById("check-info").style.display = "block";
-    document.getElementById("check-info").textContent =
-      `Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
+    document.getElementById("check-info").textContent = `Получено: ${fmtAmt(d.tx.amount, d.tx.asset)} ${d.tx.asset}`;
     document.getElementById("act-code").value = "";
     toast("Чек активирован", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-
-// ── Invoice ──────────────────────────────────────────────────────────────────
 let _lastInvId = "";
-
 async function createInvoice() {
   const currency = document.getElementById("inv-currency").value;
-  const amount   = parseFloat(document.getElementById("inv-amount").value);
-  const comment  = document.getElementById("inv-comment").value.trim();
+  const amount = parseFloat(document.getElementById("inv-amount").value);
+  const comment = document.getElementById("inv-comment").value.trim();
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   try {
     const d = await api("POST", "/api/invoice/create", { currency, amount, comment });
@@ -991,249 +1022,128 @@ async function createInvoice() {
     toast("Счёт создан", "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-
-function copyInvoiceId() {
-  if (_lastInvId) copyToClipboard(_lastInvId);
-}
-
+function copyInvoiceId() { if (_lastInvId) copyToClipboard(_lastInvId); }
 async function lookupInvoice() {
   const id = document.getElementById("pay-inv-id").value.trim();
   if (!id) { toast("Введите ID счёта", "err"); return; }
-  const info = document.getElementById("inv-lookup");
-  const btn  = document.getElementById("btn-pay-inv");
+  const info = document.getElementById("inv-lookup"), btn = document.getElementById("btn-pay-inv");
   try {
     const d = await api("GET", `/api/invoice/${encodeURIComponent(id)}`);
     const inv = d.invoice;
-    const statusBadge = inv.status === "pending"
-      ? `<span class="badge badge-pending">ожидает</span>`
-      : `<span class="badge badge-paid">оплачен</span>`;
-    info.innerHTML = `<b>${fmtAmt(inv.amount, inv.currency)} ${inv.currency}</b> ${statusBadge}<br>
+    const sb = inv.status === "pending" ? `<span class="badge badge-pending">ожидает</span>`
+                                        : `<span class="badge badge-paid">оплачен</span>`;
+    info.innerHTML = `<b>${fmtAmt(inv.amount, inv.currency)} ${inv.currency}</b> ${sb}<br>
       <span style="color:var(--hint)">${inv.comment || "—"}</span>`;
     info.style.display = "block";
     btn.style.display = inv.status === "pending" ? "block" : "none";
     state.currentInvoice = id;
   } catch (e) { toast(e.message, "err"); }
 }
-
 async function payInvoice() {
   if (!state.currentInvoice) return;
   try {
     const d = await api("POST", `/api/invoice/${encodeURIComponent(state.currentInvoice)}/pay`);
     updateBalances(d.balances);
     document.getElementById("btn-pay-inv").style.display = "none";
-    document.getElementById("inv-lookup").innerHTML +=
-      `<br><span style="color:var(--green)">Оплачено</span>`;
+    document.getElementById("inv-lookup").innerHTML += `<br><span style="color:var(--green)">Оплачено</span>`;
     document.getElementById("pay-inv-id").value = "";
-    toast("Счёт оплачен", "ok");
-    state.currentInvoice = null;
+    toast("Счёт оплачен", "ok"); state.currentInvoice = null;
   } catch (e) { toast(e.message, "err"); }
 }
-
-// ── Swap ──────────────────────────────────────────────────────────────────────
 async function updateRate() {
-  const from   = document.getElementById("sw-from").value;
-  const to     = document.getElementById("sw-to").value;
+  const from = document.getElementById("sw-from").value, to = document.getElementById("sw-to").value;
   const amount = parseFloat(document.getElementById("sw-amount").value);
-  const info   = document.getElementById("rate-info");
-  const resEl  = document.getElementById("sw-result");
+  const info = document.getElementById("rate-info"), resEl = document.getElementById("sw-result");
   if (from === to) { info.textContent = "Выберите разные активы"; resEl.value = ""; return; }
   if (!amount || amount <= 0) { info.textContent = "Введите сумму"; resEl.value = ""; return; }
   try {
     const d = await api("GET", `/api/swap/rate?from_asset=${from}&to_asset=${to}&amount=${amount}`);
-    resEl.value = d.result;
-    info.textContent = `1 ${from} ≈ ${d.rate} ${to}`;
+    resEl.value = d.result; info.textContent = `1 ${from} ≈ ${d.rate} ${to}`;
   } catch (_) { info.textContent = "Пара не поддерживается"; resEl.value = ""; }
 }
-
 function swapAssets() {
-  const f = document.getElementById("sw-from");
-  const t = document.getElementById("sw-to");
-  [f.value, t.value] = [t.value, f.value];
-  updateRate();
+  const f = document.getElementById("sw-from"), t = document.getElementById("sw-to");
+  [f.value, t.value] = [t.value, f.value]; updateRate();
 }
-
 async function doSwap() {
-  const from_asset = document.getElementById("sw-from").value;
-  const to_asset   = document.getElementById("sw-to").value;
-  const amount     = parseFloat(document.getElementById("sw-amount").value);
+  const from_asset = document.getElementById("sw-from").value, to_asset = document.getElementById("sw-to").value;
+  const amount = parseFloat(document.getElementById("sw-amount").value);
   if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
   if (from_asset === to_asset) { toast("Выберите разные активы", "err"); return; }
   try {
     const d = await api("POST", "/api/swap", { from_asset, to_asset, amount });
     updateBalances(d.balances);
-    document.getElementById("sw-amount").value = "";
-    document.getElementById("sw-result").value = "";
+    document.getElementById("sw-amount").value = ""; document.getElementById("sw-result").value = "";
     document.getElementById("rate-info").textContent = "Введите сумму для расчёта курса";
     toast(`Получено ${fmtAmt(d.received, to_asset)} ${to_asset}`, "ok");
   } catch (e) { toast(e.message, "err"); }
 }
-
-// ── P2P ──────────────────────────────────────────────────────────────────────
-let _p2pType = "BUY";
-
 function setP2PType(type) {
-  _p2pType = type;
   document.getElementById("p2p-type").value = type;
   document.getElementById("p2p-buy-btn").className  = type === "BUY"  ? "btn btn-green btn-sm" : "btn btn-sec btn-sm";
   document.getElementById("p2p-sell-btn").className = type === "SELL" ? "btn btn-danger btn-sm" : "btn btn-sec btn-sm";
 }
-
 async function loadP2P() {
-  try {
-    const d = await api("GET", "/api/p2p/orders");
-    renderP2P(d.orders);
-  } catch (e) {
-    document.getElementById("p2p-list").innerHTML =
-      `<div class="empty" style="color:var(--red)">${e.message}</div>`;
-  }
+  try { const d = await api("GET", "/api/p2p/orders"); renderP2P(d.orders); }
+  catch (e) { document.getElementById("p2p-list").innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`; }
 }
-
 function renderP2P(orders) {
   const el = document.getElementById("p2p-list");
-  if (!orders || !orders.length) {
-    el.innerHTML = `<div class="empty">Нет открытых ордеров</div>`;
-    return;
-  }
+  if (!orders || !orders.length) { el.innerHTML = `<div class="empty">Нет открытых ордеров</div>`; return; }
   el.innerHTML = orders.map(o => {
-    const total = (o.amount * o.price).toFixed(2);
-    const isBuy = o.type === "BUY";
+    const total = (o.amount * o.price).toFixed(2), isBuy = o.type === "BUY";
     return `<div class="order-card">
-      <div class="order-top">
-        <span class="badge ${isBuy ? "badge-buy" : "badge-sell"}">${o.type}</span>
-        <span style="font-size:12.5px;color:var(--hint)">${o.creator_name}</span>
-      </div>
-      <div class="order-info">${fmtAmt(o.amount, o.asset)} ${o.asset} по цене ${o.price} ${o.currency}</div>
+      <div class="order-top"><span class="badge ${isBuy?"badge-buy":"badge-sell"}">${o.type}</span>
+        <span style="font-size:12.5px;color:var(--hint)">${o.creator_name}</span></div>
+      <div class="order-info">${fmtAmt(o.amount,o.asset)} ${o.asset} по цене ${o.price} ${o.currency}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="order-price">${total} ${o.currency}</div>
-        <button class="btn btn-sm ${isBuy ? "btn-sec" : "btn-green"}"
-          onclick="takeOrder('${o.id}')">
-          ${isBuy ? "Продать" : "Купить"}
-        </button>
-      </div>
-    </div>`;
+        <button class="btn btn-sm ${isBuy?"btn-sec":"btn-green"}" onclick="takeOrder('${o.id}')">${isBuy?"Продать":"Купить"}</button>
+      </div></div>`;
   }).join("");
 }
-
 async function createOrder() {
-  const type     = document.getElementById("p2p-type").value;
-  const asset    = document.getElementById("p2p-asset").value;
-  const amount   = parseFloat(document.getElementById("p2p-amount").value);
-  const price    = parseFloat(document.getElementById("p2p-price").value);
+  const type = document.getElementById("p2p-type").value, asset = document.getElementById("p2p-asset").value;
+  const amount = parseFloat(document.getElementById("p2p-amount").value);
+  const price = parseFloat(document.getElementById("p2p-price").value);
   const currency = document.getElementById("p2p-currency").value;
-  if (!amount || amount <= 0 || !price || price <= 0) {
-    toast("Введите сумму и цену", "err"); return;
-  }
+  if (!amount || amount <= 0 || !price || price <= 0) { toast("Введите сумму и цену", "err"); return; }
   try {
     await api("POST", "/api/p2p/order", { type, asset, amount, price, currency });
-    document.getElementById("p2p-amount").value = "";
-    document.getElementById("p2p-price").value  = "";
-    const wd = await api("GET", "/api/wallet");
-    updateBalances(wd.balances);
-    toast("Ордер размещён", "ok");
-    loadP2P();
+    document.getElementById("p2p-amount").value = ""; document.getElementById("p2p-price").value = "";
+    const wd = await api("GET", "/api/wallet"); updateBalances(wd.balances);
+    toast("Ордер размещён", "ok"); loadP2P();
   } catch (e) { toast(e.message, "err"); }
 }
-
 async function takeOrder(id) {
   try {
     const d = await api("POST", `/api/p2p/order/${id}/take`);
-    updateBalances(d.balances);
-    toast("Ордер закрыт", "ok");
-    loadP2P();
+    updateBalances(d.balances); toast("Ордер закрыт", "ok"); loadP2P();
   } catch (e) { toast(e.message, "err"); }
 }
-
-// ── Refresh с блокчейна ──────────────────────────────────────────────────────
 async function refreshBalances() {
-  const btn = document.getElementById("btn-refresh");
-  const prev = btn.textContent;
-  btn.textContent = "…";
-  btn.disabled = true;
+  const btn = document.getElementById("btn-refresh"); btn.disabled = true;
   try {
     const d = await api("POST", "/api/wallet/refresh");
     updateBalances(d.balances);
-    if (d.refreshed) toast("Балансы обновлены с блокчейна", "ok");
-    else toast(d.message || "Нет данных", "");
-  } catch (e) {
-    toast(e.message, "err");
-  } finally {
-    btn.textContent = prev; btn.disabled = false;
-  }
+    toast(d.refreshed ? "Балансы обновлены" : (d.message || "Нет данных"), d.refreshed ? "ok" : "");
+  } catch (e) { toast(e.message, "err"); }
+  finally { btn.disabled = false; }
 }
 
-// ── Address copy ─────────────────────────────────────────────────────────────
-function copyEthAddr() {
-  const addr = state.addresses.ETH || "";
-  if (addr) copyToClipboard(addr);
-}
-function copyBtcAddr() {
-  const addr = state.addresses.BTC || "";
-  if (addr) copyToClipboard(addr);
-}
-
-// ── Address override ─────────────────────────────────────────────────────────
-function toggleAddrOverride() {
-  const el = document.getElementById("addr-override");
-  el.style.display = el.style.display === "none" ? "block" : "none";
-  if (el.style.display === "block") {
-    document.getElementById("ov-ton").value = state.addresses.TON || "";
-    document.getElementById("ov-eth").value = state.addresses.ETH || "";
-    document.getElementById("ov-btc").value = state.addresses.BTC || "";
-    el.scrollIntoView({behavior:"smooth",block:"center"});
-  }
-}
-
-async function applyAddrOverride() {
-  const tonAddr = document.getElementById("ov-ton").value.trim();
-  const btcAddr = document.getElementById("ov-btc").value.trim();
-  try {
-    const ethAddr = document.getElementById("ov-eth").value.trim();
-    if (tonAddr) {
-      const d = await api("POST", "/api/wallet/set_address", { asset: "TON", address: tonAddr });
-      state.addresses.TON = tonAddr;
-      state.wallet.address = tonAddr;
-      document.getElementById("hdr-addr").textContent = tonAddr;
-      updateBalances(d.balances);
-    }
-    if (ethAddr) {
-      const d = await api("POST", "/api/wallet/set_address", { asset: "ETH", address: ethAddr });
-      state.addresses.ETH = ethAddr;
-      document.getElementById("hdr-eth-addr").textContent = ethAddr;
-      document.getElementById("eth-addr-row").style.display = "block";
-      updateBalances(d.balances);
-    }
-    if (btcAddr) {
-      const d = await api("POST", "/api/wallet/set_address", { asset: "BTC", address: btcAddr });
-      state.addresses.BTC = btcAddr;
-      document.getElementById("hdr-btc-addr").textContent = btcAddr;
-      document.getElementById("btc-addr-row").style.display = "block";
-      updateBalances(d.balances);
-    }
-    toggleAddrOverride();
-    toast("Адреса обновлены, балансы загружены", "ok");
-  } catch (e) {
-    toast(e.message, "err");
-  }
-}
-
-// ── Clipboard ────────────────────────────────────────────────────────────────
+// ── Clipboard ──
 function copyToClipboard(text) {
-  if (navigator.clipboard?.writeText) {
+  if (navigator.clipboard?.writeText)
     navigator.clipboard.writeText(text).then(() => toast("Скопировано", "ok")).catch(() => fallbackCopy(text));
-  } else {
-    fallbackCopy(text);
-  }
+  else fallbackCopy(text);
 }
 function fallbackCopy(text) {
   const ta = document.createElement("textarea");
   ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-  document.body.appendChild(ta); ta.select();
-  document.execCommand("copy");
-  document.body.removeChild(ta);
-  toast("Скопировано", "ok");
+  document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+  document.body.removeChild(ta); toast("Скопировано", "ok");
 }
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
