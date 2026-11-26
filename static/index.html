@@ -483,6 +483,24 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 /* нажатия на строки */
 .wallet-row:active,.asset:active{transform:scale(.985)}
 
+/* 6 вкладок — чуть компактнее */
+.bottom-nav .nav-item{font-size:10px;padding-left:0;padding-right:0}
+.bottom-nav .nav-item span{white-space:nowrap}
+
+/* стейкинг */
+.stake-row{padding:14px 0;border-bottom:1px solid var(--border)}
+.stake-row:last-child{border-bottom:none}
+.stake-top{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.stake-top .coin{width:38px;height:38px}
+.stake-main{flex:1;min-width:0}
+.stake-name{font-weight:600;font-size:15px}
+.stake-apy{font-size:12.5px;color:var(--green);font-weight:600}
+.stake-reward{text-align:right}
+.stake-reward .rv{font-weight:700;font-size:15px;color:var(--green);font-variant-numeric:tabular-nums}
+.stake-reward .rl{font-size:11px;color:var(--hint)}
+.stake-actions{display:flex;gap:8px}
+.stake-actions .btn{flex:1}
+
 /* доступность: без прозрачности и анимаций, если пользователь так настроил */
 @media (prefers-reduced-transparency:reduce){
   .card,.hero,.order-card,.wallet-switch,.sheet,.bottom-nav,.as-head,.chip,.qa-ic,.input,#toast{
@@ -751,6 +769,30 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
   </div>
   </div>
 
+  <!-- Вкладка: Стейкинг -->
+  <div id="tab-staking" class="tab-content" style="display:none">
+  <div class="page">
+    <div class="card">
+      <h3>Застейкать</h3>
+      <div class="hint-text">Тестовый стейкинг: награды начисляются ускоренно для демонстрации. Это не реальный ончейн-стейкинг.</div>
+      <div class="chips" id="stk-chips"></div>
+      <div class="field" style="margin-bottom:6px"><label>Сумма</label>
+        <div class="amount-row">
+          <input id="stk-amount" class="input" type="number" min="0.0001" step="any" placeholder="0.00" oninput="updateStakeEst()">
+          <button class="max-btn" onclick="stakeMax()">Макс</button>
+        </div>
+        <div class="avail" id="stk-avail"></div>
+      </div>
+      <div class="rate-info" id="stk-est">Выберите монету и сумму</div>
+      <button class="btn" style="margin-top:12px" onclick="doStake()">Застейкать</button>
+    </div>
+    <div class="card">
+      <h3>Мои стейки</h3>
+      <div id="stk-list"><div class="empty">Нет активных стейков</div></div>
+    </div>
+  </div>
+  </div>
+
   <!-- Нижняя навигация -->
   <nav class="bottom-nav">
     <div class="nav-item active" data-tab="wallet" onclick="switchTab('wallet')">
@@ -768,6 +810,10 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
     <div class="nav-item" data-tab="swap" onclick="switchTab('swap')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8a4 4 0 0 0-4 4v0"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13a4 4 0 0 0 4-4v0"/></svg>
       <span>Своп</span>
+    </div>
+    <div class="nav-item" data-tab="staking" onclick="switchTab('staking')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 7-7"/><path d="M15 9h5v5"/></svg>
+      <span>Стейк</span>
     </div>
     <div class="nav-item" data-tab="p2p" onclick="switchTab('p2p')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5"/><path d="M16 5.2A3 3 0 0 1 18 11"/><path d="M18.5 15c2 .6 3.5 2 3.5 4"/></svg>
@@ -1063,6 +1109,7 @@ function switchTab(tab) {
   window.scrollTo(0, 0);
   if (tab === "p2p") loadP2P();
   if (tab === "wallet") loadHistory();
+  if (tab === "staking") loadStaking(); else stopStakingPoll();
 }
 
 // ── адрес монеты ──
@@ -1080,14 +1127,16 @@ function buildChips() {
   document.getElementById("rcv-chips").innerHTML = html("rcv");
   document.getElementById("snd-chips").innerHTML = html("snd");
   document.getElementById("dep-chips").innerHTML = html("dep");
+  const stk = document.getElementById("stk-chips"); if (stk) stk.innerHTML = html("stk");
 }
-const _coin = { rcv:"TON", snd:"TON", dep:"TON" };
+const _coin = { rcv:"TON", snd:"TON", dep:"TON", stk:"TON" };
 function selectChip(prefix, asset) {
   _coin[prefix] = asset;
   document.querySelectorAll(`#${prefix}-chips .chip`).forEach(c =>
     c.classList.toggle("active", c.dataset.coin === asset));
   if (prefix === "rcv") updateReceive();
   if (prefix === "snd") updateSendAvail();
+  if (prefix === "stk") { updateStakeAvail(); updateStakeEst(); }
 }
 
 // ── Шторки (открыть/закрыть) ──
@@ -1098,6 +1147,95 @@ function openSheet(id) {
 function closeSheets() {
   document.getElementById("sheet-backdrop").classList.remove("open");
   document.querySelectorAll(".sheet").forEach(s => s.classList.remove("open"));
+}
+
+// ── Стейкинг ──
+let _stakeApy = {}, _stakePoll = null;
+async function loadStaking() {
+  try {
+    const d = await api("GET", "/api/staking");
+    _stakeApy = d.apy || {};
+    selectChip("stk", _coin.stk);
+    renderStakes(d.stakes || []);
+    startStakingPoll();
+  } catch (_) {}
+}
+function startStakingPoll() {
+  stopStakingPoll();
+  _stakePoll = setInterval(async () => {
+    if (state.activeTab !== "staking") { stopStakingPoll(); return; }
+    try { const d = await api("GET", "/api/staking"); renderStakes(d.stakes || []); } catch (_) {}
+  }, 2500);
+}
+function stopStakingPoll() { if (_stakePoll) { clearInterval(_stakePoll); _stakePoll = null; } }
+function updateStakeAvail() {
+  const coin = _coin.stk, bal = Number(state.wallet?.balances?.[coin] || 0);
+  const el = document.getElementById("stk-avail");
+  if (el) el.textContent = `Доступно: ${fmtAmt(bal, coin)} ${coin}`;
+}
+function updateStakeEst() {
+  const coin = _coin.stk, apy = _stakeApy[coin] || 0;
+  const amt = parseFloat(document.getElementById("stk-amount").value) || 0;
+  const est = document.getElementById("stk-est");
+  if (!est) return;
+  est.textContent = amt > 0
+    ? `APY ${apy}% · ≈ ${fmtAmt(amt * apy / 100, coin)} ${coin}/год`
+    : `APY ${apy}% · введите сумму`;
+}
+function stakeMax() {
+  const coin = _coin.stk, bal = Number(state.wallet?.balances?.[coin] || 0);
+  document.getElementById("stk-amount").value = bal > 0 ? bal : "";
+  updateStakeEst();
+}
+async function doStake() {
+  const asset = _coin.stk, amount = parseFloat(document.getElementById("stk-amount").value);
+  if (!amount || amount <= 0) { toast("Введите сумму", "err"); return; }
+  try {
+    const d = await api("POST", "/api/staking/stake", { asset, amount });
+    updateBalances(d.balances);
+    document.getElementById("stk-amount").value = "";
+    updateStakeAvail(); updateStakeEst();
+    toast(`Застейкано ${fmtAmt(amount, asset)} ${asset}`, "ok");
+    loadStaking();
+  } catch (e) { toast(e.message, "err"); }
+}
+async function claimStake(id) {
+  try {
+    const d = await api("POST", "/api/staking/claim", { id });
+    updateBalances(d.balances);
+    toast("Награда зачислена", "ok");
+    loadStaking();
+  } catch (e) { toast(e.message, "err"); }
+}
+async function unstakeStake(id) {
+  try {
+    const d = await api("POST", "/api/staking/unstake", { id });
+    updateBalances(d.balances);
+    toast("Выведено из стейкинга", "ok");
+    loadStaking();
+  } catch (e) { toast(e.message, "err"); }
+}
+function renderStakes(list) {
+  const el = document.getElementById("stk-list");
+  if (!el) return;
+  if (!list || !list.length) { el.innerHTML = `<div class="empty">Нет активных стейков</div>`; return; }
+  el.innerHTML = list.map(s => {
+    const m = COIN_META[s.asset] || { img: "ton.svg", name: s.asset };
+    return `<div class="stake-row">
+      <div class="stake-top">
+        <div class="coin"><img src="/static/coins/${m.img}" alt="${s.asset}"></div>
+        <div class="stake-main">
+          <div class="stake-name">${fmtAmt(s.amount, s.asset)} ${s.asset}</div>
+          <div class="stake-apy">${s.apy}% годовых</div>
+        </div>
+        <div class="stake-reward"><div class="rv">+${fmtAmt(s.reward, s.asset)}</div><div class="rl">награда</div></div>
+      </div>
+      <div class="stake-actions">
+        <button class="btn btn-sec btn-sm" onclick="claimStake('${s.id}')">Забрать награду</button>
+        <button class="btn btn-sm" onclick="unstakeStake('${s.id}')">Вывести</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 // ── Получить ──
@@ -1317,9 +1455,10 @@ async function loadHistory() {
   catch (_) {}
 }
 const TX_LABEL = { deposit:"Пополнение", withdraw:"Вывод", transfer_out:"Перевод",
-  transfer_in:"Получено", swap:"Обмен", check_in:"Получен чек", check_out:"Создан чек" };
-const TX_DIR = { deposit:"in", transfer_in:"in", check_in:"in",
-  withdraw:"out", transfer_out:"out", check_out:"out", swap:"swap" };
+  transfer_in:"Получено", swap:"Обмен", check_in:"Получен чек", check_out:"Создан чек",
+  stake:"Стейкинг", unstake:"Вывод из стейкинга", reward:"Награда за стейкинг" };
+const TX_DIR = { deposit:"in", transfer_in:"in", check_in:"in", unstake:"in", reward:"in",
+  withdraw:"out", transfer_out:"out", check_out:"out", swap:"swap", stake:"out" };
 const TX_SVG = {
   in:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
   out:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',

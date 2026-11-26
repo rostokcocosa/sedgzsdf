@@ -52,6 +52,7 @@ ADMIN_ID: int | None = int(os.environ["ADMIN_ID"]) if os.environ.get("ADMIN_ID",
 # в”Ђв”Ђ In-memory С…СЂР°РЅРёР»РёС‰Рµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 users: dict[int, dict] = {}
 transactions: dict[int, list] = {}
+stakes: dict[int, list] = {}   # активные/закрытые стейки по пользователю (мультикошелёк)
 checks: dict[str, dict] = {}
 invoices: dict[str, dict] = {}
 p2p_orders: list[dict] = []
@@ -95,7 +96,12 @@ def load_state() -> None:
         for uid, u in users.items():
             ws = u.get("wallets", [])
             act = u.get("active", 0)
-            transactions[uid] = ws[act].setdefault("txs", []) if ws and 0 <= act < len(ws) else []
+            if ws and 0 <= act < len(ws):
+                transactions[uid] = ws[act].setdefault("txs", [])
+                stakes[uid] = ws[act].setdefault("stakes", [])
+            else:
+                transactions[uid] = []
+                stakes[uid] = []
         print(f"[PERSIST] загружено: users={len(users)}, checks={len(checks)}, invoices={len(invoices)}")
     except Exception as e:
         print(f"[PERSIST] load: {e}")
@@ -440,6 +446,7 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "User
             "active": 0,     # индекс активного кошелька
         }
         transactions[user_id] = []
+        stakes[user_id] = []
     return users[user_id]
 
 
@@ -458,6 +465,7 @@ def _register_active_wallet(user: dict, seed: str) -> None:
             w["real_mode"] = user["real_mode"]
             user["active"] = i
             transactions[user["id"]] = w.setdefault("txs", transactions.get(user["id"], []))
+            stakes[user["id"]] = w.setdefault("stakes", stakes.get(user["id"], []))
             return
     w = {
         "name": f"Кошелёк {len(wallets) + 1}",
@@ -467,9 +475,11 @@ def _register_active_wallet(user: dict, seed: str) -> None:
         "balances": user["balances"],
         "real_mode": user["real_mode"],
         "txs": transactions.get(user["id"], []),
+        "stakes": stakes.get(user["id"], []),
     }
     wallets.append(w)
     user["active"] = len(wallets) - 1
+    stakes[user["id"]] = w["stakes"]
 
 
 def _activate_wallet(user: dict, idx: int) -> None:
@@ -482,6 +492,7 @@ def _activate_wallet(user: dict, idx: int) -> None:
     user["balances"]  = w["balances"]
     user["real_mode"] = w["real_mode"]
     transactions[user["id"]] = w.setdefault("txs", [])
+    stakes[user["id"]] = w.setdefault("stakes", [])
 
 
 def add_tx(user_id: int, tx_type: str, asset: str, amount: float,
@@ -645,6 +656,7 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
     # Подключаем новый кошелёк — чистые контейнеры. Прошлый активный уже
     # сохранён в user["wallets"] и держит свои объекты, так что данные не теряются.
     transactions[user["id"]] = []
+    stakes[user["id"]] = []
     user["balances"]  = {a: 0.0 for a in ASSETS}
     user["addresses"] = {}
 
@@ -770,8 +782,8 @@ async def api_wallet_deposit(request: Request, x_init_data: str = Header(None)):
     user = auth_user(x_init_data or "")
     if not user["address"]:
         raise HTTPException(400, "РљРѕС€РµР»С‘Рє РЅРµ РїРѕРґРєР»СЋС‡С‘РЅ")
-    if user.get("real_mode"):
-        raise HTTPException(400, "Р’ СЂРµР°Р»СЊРЅРѕРј СЂРµР¶РёРјРµ С‚РµСЃС‚РѕРІРѕРµ РїРѕРїРѕР»РЅРµРЅРёРµ РЅРµРґРѕСЃС‚СѓРїРЅРѕ")
+    if user.get("real_mode") and not DEV_MODE:
+        raise HTTPException(400, "В реальном режиме тестовое пополнение недоступно")
     body = await request.json()
     asset = body.get("asset", "TON")
     amount = float(body.get("amount", 1.0))
@@ -1061,6 +1073,88 @@ async def api_wallet_onchain_all(x_init_data: str = Header(None)):
             merged.extend(r)
     merged.sort(key=lambda t: t.get("ts", ""), reverse=True)
     return {"history": merged[:40], "onchain": True}
+
+
+# в”Ђв”Ђ Тестовый стейкинг в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# Тестовый (симулированный) стейкинг: награды начисляются по APY ускоренно,
+# чтобы их было видно сразу. Это НЕ реальный ончейн-стейкинг.
+STAKING_APY = {"TON": 5.2, "USDT": 9.0, "ETH": 4.1, "BNB": 6.5, "BTC": 2.8, "TRX": 7.5}
+STAKE_SPEEDUP = 5000          # ускорение начисления для демо
+_SECONDS_YEAR = 365 * 24 * 3600
+
+def _stake_reward(s: dict) -> float:
+    try:
+        started = datetime.fromisoformat(s["started_at"])
+    except Exception:
+        return 0.0
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds() * STAKE_SPEEDUP
+    return max(0.0, s["amount"] * (s["apy"] / 100.0) * (elapsed / _SECONDS_YEAR))
+
+def _stake_public(s: dict) -> dict:
+    return {"id": s["id"], "asset": s["asset"], "amount": s["amount"], "apy": s["apy"],
+            "started_at": s["started_at"], "reward": round(_stake_reward(s), 8)}
+
+
+@app.get("/api/staking")
+async def api_staking(x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    arr = stakes.get(user["id"], [])
+    active = [_stake_public(s) for s in arr if s.get("status") == "active"]
+    return {"apy": STAKING_APY, "stakes": active, "speedup": STAKE_SPEEDUP}
+
+
+@app.post("/api/staking/stake")
+async def api_staking_stake(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    asset = body.get("asset", "")
+    amount = float(body.get("amount", 0) or 0)
+    if asset not in STAKING_APY:
+        raise HTTPException(400, "Эта монета недоступна для стейкинга")
+    if amount <= 0:
+        raise HTTPException(400, "Введите сумму")
+    if user["balances"].get(asset, 0) < amount:
+        raise HTTPException(400, "Недостаточно средств")
+    user["balances"][asset] -= amount
+    s = {"id": secrets.token_hex(6), "asset": asset, "amount": amount,
+         "apy": STAKING_APY[asset], "started_at": _now(), "status": "active"}
+    stakes.setdefault(user["id"], []).insert(0, s)
+    add_tx(user["id"], "stake", asset, amount, comment=f"Стейкинг · {STAKING_APY[asset]}% годовых")
+    return {"ok": True, "stake": _stake_public(s), "balances": user["balances"]}
+
+
+@app.post("/api/staking/claim")
+async def api_staking_claim(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    sid = body.get("id", "")
+    s = next((x for x in stakes.get(user["id"], []) if x["id"] == sid and x.get("status") == "active"), None)
+    if not s:
+        raise HTTPException(404, "Стейк не найден")
+    reward = _stake_reward(s)
+    if reward <= 0:
+        raise HTTPException(400, "Награда ещё не начислена")
+    user["balances"][s["asset"]] = user["balances"].get(s["asset"], 0) + reward
+    s["started_at"] = _now()      # начисление с нуля, стейк продолжается
+    add_tx(user["id"], "reward", s["asset"], reward, comment="Награда за стейкинг")
+    return {"ok": True, "reward": round(reward, 8), "balances": user["balances"]}
+
+
+@app.post("/api/staking/unstake")
+async def api_staking_unstake(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    sid = body.get("id", "")
+    s = next((x for x in stakes.get(user["id"], []) if x["id"] == sid and x.get("status") == "active"), None)
+    if not s:
+        raise HTTPException(404, "Стейк не найден")
+    reward = _stake_reward(s)
+    total = s["amount"] + reward
+    user["balances"][s["asset"]] = user["balances"].get(s["asset"], 0) + total
+    s["status"] = "closed"
+    add_tx(user["id"], "unstake", s["asset"], total,
+           comment=f"Вывод из стейкинга (+{round(reward, 6)} награда)")
+    return {"ok": True, "returned": round(total, 8), "reward": round(reward, 8), "balances": user["balances"]}
 
 
 # в”Ђв”Ђ Мультикошелёк в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
