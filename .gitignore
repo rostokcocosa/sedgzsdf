@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+wallet_data.json
+wallet_data.json.tmp

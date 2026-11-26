@@ -1018,7 +1018,7 @@ function renderAssetHistory(list, asset, meta) {
 
 // ── История ──
 async function loadHistory() {
-  try { const d = await api("GET", "/api/wallet/history"); renderHistory(d.history); }
+  try { const d = await api("GET", "/api/wallet/onchain_all"); renderHistory(d.history); }
   catch (_) {}
 }
 const TX_LABEL = { deposit:"Пополнение", withdraw:"Вывод", transfer_out:"Перевод",
