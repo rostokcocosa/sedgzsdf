@@ -1098,21 +1098,59 @@ p2p_orders.extend([
 
 
 # в”Ђв”Ђ РўРѕС‡РєР° РІС…РѕРґР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+async def _configure_bot(bot) -> None:
+    """Самонастройка бота при старте: команды меню + кнопка запуска Mini App.
+
+    Делает деплой самодостаточным — не нужно вручную настраивать меню в BotFather.
+    Кнопка-меню и inline-кнопка всегда указывают на актуальный WEBAPP_URL.
+    """
+    from aiogram.types import (
+        BotCommand, MenuButtonWebApp, MenuButtonCommands, WebAppInfo,
+    )
+    try:
+        await bot.set_my_commands([
+            BotCommand(command="start",  description="Запуск / открыть кошелёк"),
+            BotCommand(command="seed",   description="Показать seed-фразу"),
+            BotCommand(command="status", description="Показать баланс"),
+        ])
+        if WEBAPP_URL.startswith("https://"):
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="DeFi Wallet",
+                    web_app=WebAppInfo(url=WEBAPP_URL),
+                )
+            )
+            print(f"[BOT] Кнопка-меню Mini App → {WEBAPP_URL}")
+        else:
+            # Без HTTPS Telegram не примет WebApp — откатываемся на обычное меню команд.
+            await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+            print("[BOT][WARN] WEBAPP_URL не https:// — кнопка Mini App отключена. "
+                  f"Текущее значение: {WEBAPP_URL!r}")
+    except Exception as e:
+        print(f"[BOT][WARN] Не удалось настроить меню бота: {e}")
+
+
 async def main():
     print(f"[APP] WEBAPP_URL = {WEBAPP_URL}")
-    print(f"[APP] BOT_TOKEN  = {'...'+BOT_TOKEN[-8:] if BOT_TOKEN else 'РЅРµ Р·Р°РґР°РЅ'}")
+    print(f"[APP] BOT_TOKEN  = {'...'+BOT_TOKEN[-8:] if BOT_TOKEN else 'не задан'}")
     print(f"[APP] DEV_MODE   = {DEV_MODE}")
-    print(f"[APP] BLOCKCHAIN = {'РґРѕСЃС‚СѓРїРµРЅ (bip_utils + aiohttp)' if BLOCKCHAIN_AVAILABLE else 'РЅРµРґРѕСЃС‚СѓРїРµРЅ вЂ” pip install bip_utils aiohttp'}")
-    print(f"[APP] РЎРµСЂРІРµСЂ     : http://0.0.0.0:{PORT}")
+    print(f"[APP] BLOCKCHAIN = {'доступен (bip_utils + aiohttp)' if BLOCKCHAIN_AVAILABLE else 'недоступен — pip install bip_utils aiohttp'}")
+    print(f"[APP] Сервер     : http://0.0.0.0:{PORT}")
+    if not WEBAPP_URL.startswith("https://"):
+        print("[APP][WARN] WEBAPP_URL не начинается с https:// — кнопка Mini App "
+              "не появится. Задайте WEBAPP_URL в переменных окружения (Railway → Variables).")
 
     config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
     server = uvicorn.Server(config)
 
     if _bot and _dp:
-        print("[BOT] Р—Р°РїСѓСЃРє long pollingвЂ¦")
+        print("[BOT] Запуск long polling…")
+        await _configure_bot(_bot)
         await asyncio.gather(server.serve(), _dp.start_polling(_bot, handle_signals=False))
         await _bot.session.close()
     else:
+        print("[APP][WARN] BOT_TOKEN не задан — бот не запущен, работает только веб-сервер. "
+              "Задайте BOT_TOKEN в переменных окружения (Railway → Variables), чтобы бот отвечал на команды.")
         await server.serve()
 
 
