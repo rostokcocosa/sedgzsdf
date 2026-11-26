@@ -380,23 +380,57 @@ def verify_init_data(init_data: str) -> Optional[dict]:
         return None
 
 
+def _parse_init_data_user(init_data: str) -> Optional[dict]:
+    """Достаёт объект user из initData БЕЗ проверки подписи.
+
+    Используется только в DEV_MODE, чтобы у каждого Telegram-аккаунта был свой
+    кошелёк даже когда HMAC не сходится (например, локальный BOT_TOKEN отличается).
+    """
+    if not init_data:
+        return None
+    try:
+        parsed = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        user_json = parsed.get("user")
+        if not user_json:
+            return None
+        return json.loads(user_json)
+    except Exception:
+        return None
+
+
 def auth_user(init_data: str) -> dict:
+    # 1) Боевой путь: валидная подпись initData → реальный пользователь.
+    user_data = verify_init_data(init_data) if init_data else None
+
+    # 2) DEV_MODE: подпись не прошла, но initData есть (открыто из Telegram) —
+    #    берём реального пользователя из initData БЕЗ проверки подписи,
+    #    чтобы у каждого аккаунта был СВОЙ кошелёк, а не общий.
+    if not user_data and DEV_MODE and init_data:
+        user_data = _parse_init_data_user(init_data)
+
+    if user_data and user_data.get("id") is not None:
+        return get_or_create_user(
+            int(user_data["id"]),
+            user_data.get("username", ""),
+            user_data.get("first_name", "User"),
+        )
+
+    # 3) DEV_MODE без initData (открыто из обычного браузера, не из Telegram) —
+    #    единственный случай общего dev-кошелька.
     if DEV_MODE:
         return get_or_create_user(99999, "devuser", "Dev User")
+
+    # 4) Прод без валидной подписи → отказ.
     if not init_data:
-        raise HTTPException(401, detail="initData РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚. РћС‚РєСЂРѕР№С‚Рµ РїСЂРёР»РѕР¶РµРЅРёРµ РёР· Telegram.")
-    user_data = verify_init_data(init_data)
-    if not user_data:
-        raise HTTPException(
-            401,
-            detail=(
-                "РџСЂРѕРІРµСЂРєР° HMAC-SHA256 initData РЅРµ РїСЂРѕС€Р»Р°. "
-                "Р’РѕР·РјРѕР¶РЅС‹Рµ РїСЂРёС‡РёРЅС‹: РЅРµРІРµСЂРЅС‹Р№ BOT_TOKEN, "
-                "РїСЂРёР»РѕР¶РµРЅРёРµ РѕС‚РєСЂС‹С‚Рѕ РЅРµ РёР· Telegram, РёР»Рё РїРѕРґРїРёСЃСЊ СѓСЃС‚Р°СЂРµР»Р°."
-            ),
-        )
-    user_id = int(user_data["id"])
-    return get_or_create_user(user_id, user_data.get("username", ""), user_data.get("first_name", "User"))
+        raise HTTPException(401, detail="initData отсутствует. Откройте приложение из Telegram.")
+    raise HTTPException(
+        401,
+        detail=(
+            "Проверка HMAC-SHA256 initData не прошла. "
+            "Возможные причины: неверный BOT_TOKEN, "
+            "приложение открыто не из Telegram, или подпись устарела."
+        ),
+    )
 
 
 # в”Ђв”Ђ FastAPI РїСЂРёР»РѕР¶РµРЅРёРµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
