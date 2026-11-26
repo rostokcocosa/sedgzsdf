@@ -474,12 +474,8 @@ html[data-scheme="dark"] .card::before,html[data-scheme="dark"] .hero::before{op
 .hero::before{animation:heroSheen 9s ease-in-out infinite alternate}
 @keyframes heroSheen{from{transform:translateX(-5%) translateY(0)}to{transform:translateX(7%) translateY(2%)}}
 
-/* баланс — лёгкий градиент в стекле */
-.hero-total{background:linear-gradient(177deg, var(--text), color-mix(in srgb, var(--text) 68%, var(--accent)));
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-html[data-scheme="dark"] .hero-total{
-  background:linear-gradient(177deg, #fff, color-mix(in srgb, #fff 70%, var(--accent)));
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+/* баланс — сплошной цвет (без градиентного текста) */
+.hero-total{color:var(--text)}
 
 /* шторка открывается с лёгким пружинным овершутом */
 .sheet{transition:transform .42s cubic-bezier(.22,1.12,.32,1)}
