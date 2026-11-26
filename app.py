@@ -56,7 +56,7 @@ checks: dict[str, dict] = {}
 invoices: dict[str, dict] = {}
 p2p_orders: list[dict] = []
 
-ASSETS = ["TON", "USDT", "ETH", "BNB", "BTC"]
+ASSETS = ["TON", "USDT", "ETH", "BNB", "BTC", "TRX"]
 TEST_RATES: dict[tuple, float] = {
     ("TON",  "USDT"): 7.50,       ("USDT", "TON"):  1 / 7.50,
     ("BTC",  "USDT"): 95000.0,    ("USDT", "BTC"):  1 / 95000.0,
@@ -68,6 +68,8 @@ TEST_RATES: dict[tuple, float] = {
     ("BNB",  "TON"):  80.0,        ("TON",  "BNB"):  1 / 80.0,
     ("BNB",  "ETH"):  0.1875,      ("ETH",  "BNB"):  1 / 0.1875,
     ("BNB",  "BTC"):  0.006316,    ("BTC",  "BNB"):  1 / 0.006316,
+    ("TRX",  "USDT"): 0.30,        ("USDT", "TRX"):  1 / 0.30,
+    ("TRX",  "TON"):  0.04,        ("TON",  "TRX"):  1 / 0.04,
 }
 
 # USDT Jetton РЅР° TON mainnet
@@ -85,6 +87,9 @@ BSC_RPC_URLS = [
     "https://bsc-dataseed1.binance.org",
     "https://bsc-dataseed2.binance.org",
 ]
+# Tron (TRX + USDT TRC-20)
+TRONGRID_URL = "https://api.trongrid.io"
+USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
 
 mnemo = Mnemonic("english")
 
@@ -140,6 +145,17 @@ def derive_all_addresses(mnemonic_phrase: str) -> dict:
 
         # BNB (BSC) — same EVM address as ETH
         result["BNB"] = result.get("ETH", "")
+
+        # TRON — BIP-44, coin type 195, m/44'/195'/0'/0/0
+        try:
+            tron_ctx = (
+                Bip44.FromSeed(seed_bytes, Bip44Coins.TRON)
+                .Purpose().Coin().Account(0)
+                .Change(Bip44Changes.CHAIN_EXT).AddressIndex(0)
+            )
+            result["TRON"] = tron_ctx.PublicKey().ToAddress()
+        except Exception as e:
+            print(f"[DERIVE][TRON] {e}")
 
     except Exception as e:
         print(f"[DERIVE] РћР±С‰Р°СЏ РѕС€РёР±РєР°: {e}")
@@ -304,11 +320,41 @@ async def fetch_usdt_bsc_balance(address: str) -> float:
         print(f"[USDT-BSC] {e}")
     return 0.0
 
+async def fetch_tron_balances(tron_address: str) -> tuple[float, float]:
+    """TRX + USDT (TRC-20) баланс через TronGrid. Возвращает (trx, usdt)."""
+    if not tron_address or not BLOCKCHAIN_AVAILABLE:
+        return 0.0, 0.0
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"{TRONGRID_URL}/v1/accounts/{tron_address}"
+            async with sess.get(url, headers={"Accept": "application/json"},
+                                timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status != 200:
+                    return 0.0, 0.0
+                data = await r.json()
+                arr = data.get("data") or []
+                if not arr:
+                    return 0.0, 0.0
+                acc = arr[0]
+                trx = int(acc.get("balance", 0)) / 1e6
+                usdt = 0.0
+                for tok in acc.get("trc20", []):
+                    if USDT_TRC20_CONTRACT in tok:
+                        usdt = int(tok[USDT_TRC20_CONTRACT]) / 1e6
+                        break
+                print(f"[TRON] {tron_address[:10]}... TRX={trx} USDT={usdt}")
+                return trx, usdt
+    except Exception as e:
+        print(f"[TRON] {e}")
+    return 0.0, 0.0
+
+
 async def fetch_real_balances(addresses: dict) -> dict:
     ton_addr = addresses.get("TON", "")
     btc_addr = addresses.get("BTC", "")
     eth_addr = addresses.get("ETH", "")
     bnb_addr = addresses.get("BNB", eth_addr)  # BSC = same EVM address as ETH
+    tron_addr = addresses.get("TRON", "")
     results = await asyncio.gather(
         fetch_ton_balance(ton_addr),
         fetch_usdt_ton_balance(ton_addr),
@@ -317,16 +363,19 @@ async def fetch_real_balances(addresses: dict) -> dict:
         fetch_usdt_eth_balance(eth_addr),
         fetch_bnb_balance(bnb_addr),
         fetch_usdt_bsc_balance(bnb_addr),
+        fetch_tron_balances(tron_addr),
         return_exceptions=True,
     )
     def _s(v): return v if not isinstance(v, Exception) else 0.0
-    ton_bal, usdt_ton, btc_bal, eth_bal, usdt_eth, bnb_bal, usdt_bsc = results
+    ton_bal, usdt_ton, btc_bal, eth_bal, usdt_eth, bnb_bal, usdt_bsc, tron_res = results
+    trx_bal, usdt_tron = tron_res if isinstance(tron_res, tuple) else (0.0, 0.0)
     return {
         "TON":  _s(ton_bal),
-        "USDT": round(_s(usdt_ton) + _s(usdt_eth) + _s(usdt_bsc), 6),
+        "USDT": round(_s(usdt_ton) + _s(usdt_eth) + _s(usdt_bsc) + usdt_tron, 6),
         "ETH":  _s(eth_bal),
         "BNB":  _s(bnb_bal),
         "BTC":  _s(btc_bal),
+        "TRX":  trx_bal,
     }
 
 
@@ -342,10 +391,53 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "User
             "address": None,
             "addresses": {},       # {asset: on-chain address}
             "real_mode": False,    # True вЂ” СЂРµР°Р»СЊРЅС‹Р№ Р±Р»РѕРєС‡РµР№РЅ
-            "balances": {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0},
+            "balances": {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0, "TRX": 0.0},
+            "wallets": [],   # список сохранённых кошельков (мультикошелёк)
+            "active": 0,     # индекс активного кошелька
         }
         transactions[user_id] = []
     return users[user_id]
+
+
+def _register_active_wallet(user: dict, seed: str) -> None:
+    """Регистрирует/обновляет текущий (только что подключённый) кошелёк в списке.
+
+    Каждый кошелёк держит собственные dict-объекты balances/addresses и список txs;
+    верхнеуровневые поля user зеркалят активный кошелёк. Прошлые кошельки сохраняются.
+    """
+    wallets = user.setdefault("wallets", [])
+    for i, w in enumerate(wallets):
+        if w.get("seed") == seed:  # повторное подключение — обновляем на месте
+            w["address"]   = user["address"]
+            w["addresses"] = user["addresses"]
+            w["balances"]  = user["balances"]
+            w["real_mode"] = user["real_mode"]
+            user["active"] = i
+            transactions[user["id"]] = w.setdefault("txs", transactions.get(user["id"], []))
+            return
+    w = {
+        "name": f"Кошелёк {len(wallets) + 1}",
+        "seed": seed,
+        "address": user["address"],
+        "addresses": user["addresses"],
+        "balances": user["balances"],
+        "real_mode": user["real_mode"],
+        "txs": transactions.get(user["id"], []),
+    }
+    wallets.append(w)
+    user["active"] = len(wallets) - 1
+
+
+def _activate_wallet(user: dict, idx: int) -> None:
+    """Делает кошелёк idx активным: верхнеуровневые поля ссылаются на его объекты."""
+    w = user["wallets"][idx]
+    user["active"]    = idx
+    user["seed"]      = w["seed"]
+    user["address"]   = w["address"]
+    user["addresses"] = w["addresses"]
+    user["balances"]  = w["balances"]
+    user["real_mode"] = w["real_mode"]
+    transactions[user["id"]] = w.setdefault("txs", [])
 
 
 def add_tx(user_id: int, tx_type: str, asset: str, amount: float,
@@ -494,6 +586,12 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
     body = await request.json()
     seed = body.get("seed", "").strip()
 
+    # Подключаем новый кошелёк — чистые контейнеры. Прошлый активный уже
+    # сохранён в user["wallets"] и держит свои объекты, так что данные не теряются.
+    transactions[user["id"]] = []
+    user["balances"]  = {a: 0.0 for a in ASSETS}
+    user["addresses"] = {}
+
     if seed == "generate":
         # РўРµСЃС‚РѕРІС‹Р№ СЂРµР¶РёРј: РіРµРЅРµСЂР°С†РёСЏ Рё С„РёРєС‚РёРІРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹
         seed = mnemo.generate(strength=128)
@@ -502,7 +600,7 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
         user["address"] = _fake_address(seed)
         user["addresses"] = {"TON": user["address"], "ETH": "", "BNB": "", "BTC": ""}
         if all(v == 0.0 for v in user["balances"].values()):
-            user["balances"] = {"TON": 10.0, "USDT": 75.0, "ETH": 0.5, "BNB": 2.0, "BTC": 0.001}
+            user["balances"] = {"TON": 10.0, "USDT": 75.0, "ETH": 0.5, "BNB": 2.0, "BTC": 0.001, "TRX": 250.0}
             add_tx(user["id"], "deposit", "TON",  10.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
             add_tx(user["id"], "deposit", "USDT", 75.0,  comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
             add_tx(user["id"], "deposit", "BTC",  0.001, comment="РўРµСЃС‚РѕРІС‹Р№ Р±Р°Р»Р°РЅСЃ")
@@ -533,7 +631,7 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
             print(f"[CONNECT] Р‘Р°Р»Р°РЅСЃС‹: {user['balances']}")
         else:
             # bip_utils РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ вЂ” СЂРµР°Р»СЊРЅС‹Рµ Р±Р°Р»Р°РЅСЃС‹ РЅРµРґРѕСЃС‚СѓРїРЅС‹
-            user["balances"] = {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0}
+            user["balances"] = {"TON": 0.0, "USDT": 0.0, "ETH": 0.0, "BNB": 0.0, "BTC": 0.0, "TRX": 0.0}
 
     _bal = user["balances"]
     _addrs = user.get("addresses", {})
@@ -560,6 +658,7 @@ async def api_wallet_connect(request: Request, x_init_data: str = Header(None)):
         f"  🟡 BNB:  {_bal.get('BNB', 0):.4f}\n"
         f"  ₿ BTC:  {_bal.get('BTC', 0):.8f}"
     )
+    _register_active_wallet(user, seed)
     return {
         "ok": True,
         "seed": seed,
@@ -679,6 +778,210 @@ async def api_wallet_withdraw(request: Request, x_init_data: str = Header(None))
 async def api_wallet_history(x_init_data: str = Header(None)):
     user = auth_user(x_init_data or "")
     return {"history": transactions.get(user["id"], [])}
+
+
+# в”Ђв”Ђ On-chain история операций в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+def _iso_ms(ms) -> str:
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, timezone.utc).isoformat()
+    except Exception:
+        return _now()
+
+def _iso_s(s) -> str:
+    try:
+        return datetime.fromtimestamp(int(s), timezone.utc).isoformat()
+    except Exception:
+        return _now()
+
+
+async def _ton_onchain(addr: str) -> list:
+    out = []
+    if not addr:
+        return out
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"https://toncenter.com/api/v2/getTransactions?address={addr}&limit=25"
+            async with sess.get(url, timeout=aiohttp.ClientTimeout(total=12)) as r:
+                data = await r.json()
+                for t in data.get("result", []):
+                    ts = _iso_s(t.get("utime", 0))
+                    im = t.get("in_msg") or {}
+                    val = int(im.get("value") or 0)
+                    if val > 0 and im.get("source"):
+                        out.append({"type": "transfer_in", "asset": "TON", "amount": val / 1e9,
+                                    "address": im.get("source", ""), "comment": "", "status": "completed", "ts": ts})
+                    for om in (t.get("out_msgs") or []):
+                        ov = int(om.get("value") or 0)
+                        if ov > 0:
+                            out.append({"type": "transfer_out", "asset": "TON", "amount": ov / 1e9,
+                                        "address": om.get("destination", ""), "comment": "", "status": "completed", "ts": ts})
+    except Exception as e:
+        print(f"[ONCHAIN-TON] {e}")
+    return out
+
+
+async def _btc_onchain(addr: str) -> list:
+    out = []
+    if not addr:
+        return out
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = f"https://mempool.space/api/address/{addr}/txs"
+            async with sess.get(url, timeout=aiohttp.ClientTimeout(total=12)) as r:
+                for t in (await r.json())[:25]:
+                    ts = _iso_s((t.get("status") or {}).get("block_time", 0))
+                    vin = sum(v["prevout"]["value"] for v in t.get("vin", [])
+                              if v.get("prevout", {}).get("scriptpubkey_address") == addr)
+                    vout = sum(o["value"] for o in t.get("vout", [])
+                               if o.get("scriptpubkey_address") == addr)
+                    net = (vout - vin) / 1e8
+                    if abs(net) < 1e-12:
+                        continue
+                    out.append({"type": "transfer_in" if net > 0 else "transfer_out", "asset": "BTC",
+                                "amount": abs(net), "address": "", "comment": "", "status": "completed", "ts": ts})
+    except Exception as e:
+        print(f"[ONCHAIN-BTC] {e}")
+    return out
+
+
+async def _tron_trc20_onchain(addr: str) -> list:
+    out = []
+    if not addr:
+        return out
+    try:
+        async with aiohttp.ClientSession() as sess:
+            url = (f"{TRONGRID_URL}/v1/accounts/{addr}/transactions/trc20"
+                   f"?limit=25&contract_address={USDT_TRC20_CONTRACT}")
+            async with sess.get(url, headers={"Accept": "application/json"},
+                                timeout=aiohttp.ClientTimeout(total=12)) as r:
+                data = await r.json()
+                for t in data.get("data", []):
+                    is_in = t.get("to") == addr
+                    out.append({"type": "transfer_in" if is_in else "transfer_out", "asset": "USDT",
+                                "amount": int(t.get("value", 0)) / 1e6,
+                                "address": t.get("from") if is_in else t.get("to", ""),
+                                "comment": "", "status": "completed", "ts": _iso_ms(t.get("block_timestamp", 0))})
+    except Exception as e:
+        print(f"[ONCHAIN-TRON] {e}")
+    return out
+
+
+async def _trx_onchain(addr: str) -> list:
+    out = []
+    if not addr:
+        return out
+    async def _grab(sess, direction_param, tx_type):
+        res = []
+        try:
+            url = f"{TRONGRID_URL}/v1/accounts/{addr}/transactions?limit=15&only_confirmed=true&{direction_param}=true"
+            async with sess.get(url, headers={"Accept": "application/json"},
+                                timeout=aiohttp.ClientTimeout(total=12)) as r:
+                data = await r.json()
+                for t in data.get("data", []):
+                    c = (t.get("raw_data", {}).get("contract") or [{}])[0]
+                    if c.get("type") != "TransferContract":
+                        continue
+                    amt = int(c.get("parameter", {}).get("value", {}).get("amount", 0)) / 1e6
+                    if amt <= 0:
+                        continue
+                    res.append({"type": tx_type, "asset": "TRX", "amount": amt, "address": "",
+                                "comment": "", "status": "completed", "ts": _iso_ms(t.get("block_timestamp", 0))})
+        except Exception as e:
+            print(f"[ONCHAIN-TRX] {e}")
+        return res
+    try:
+        async with aiohttp.ClientSession() as sess:
+            ins, outs = await asyncio.gather(
+                _grab(sess, "only_to", "transfer_in"),
+                _grab(sess, "only_from", "transfer_out"),
+            )
+            out = ins + outs
+    except Exception as e:
+        print(f"[ONCHAIN-TRX] {e}")
+    return out
+
+
+async def fetch_onchain_history(asset: str, addrs: dict) -> list:
+    if asset == "TON":
+        return await _ton_onchain(addrs.get("TON", ""))
+    if asset == "BTC":
+        return await _btc_onchain(addrs.get("BTC", ""))
+    if asset == "USDT":
+        return await _tron_trc20_onchain(addrs.get("TRON", ""))
+    if asset == "TRX":
+        return await _trx_onchain(addrs.get("TRON", ""))
+    return []  # ETH/BNB: нужен API-ключ эксплорера — пока не реализовано
+
+
+@app.get("/api/wallet/onchain")
+async def api_wallet_onchain(asset: str, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    if asset not in ASSETS:
+        raise HTTPException(400, "РќРµРІРµСЂРЅС‹Р№ Р°РєС‚РёРІ")
+    # Тестовый режим — отфильтрованная локальная история
+    if not user.get("real_mode") or not BLOCKCHAIN_AVAILABLE:
+        txs = [t for t in transactions.get(user["id"], []) if t.get("asset") == asset]
+        return {"history": txs, "onchain": False}
+    txs = await fetch_onchain_history(asset, user.get("addresses", {}))
+    txs.sort(key=lambda t: t.get("ts", ""), reverse=True)
+    return {"history": txs, "onchain": True, "supported": asset in ("TON", "BTC", "USDT", "TRX")}
+
+
+# в”Ђв”Ђ Мультикошелёк в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+@app.get("/api/wallets")
+async def api_wallets_list(x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    wallets = user.get("wallets", [])
+    active = user.get("active", 0)
+    return {
+        "active": active,
+        "wallets": [
+            {"index": i, "name": w.get("name", f"Кошелёк {i+1}"),
+             "address": w.get("address", ""), "real_mode": w.get("real_mode", False),
+             "active": i == active}
+            for i, w in enumerate(wallets)
+        ],
+    }
+
+
+@app.post("/api/wallets/switch")
+async def api_wallets_switch(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    try:
+        idx = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        idx = -1
+    wallets = user.get("wallets", [])
+    if not (0 <= idx < len(wallets)):
+        raise HTTPException(400, "РќРµС‚ С‚Р°РєРѕРіРѕ РєРѕС€РµР»СЊРєР°")
+    _activate_wallet(user, idx)
+    return {
+        "ok": True,
+        "connected": user["seed"] is not None,
+        "address": user["address"],
+        "addresses": user.get("addresses", {}),
+        "balances": user["balances"],
+        "real_mode": user.get("real_mode", False),
+    }
+
+
+@app.post("/api/wallets/rename")
+async def api_wallets_rename(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    try:
+        idx = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        idx = -1
+    name = (body.get("name") or "").strip()[:30]
+    wallets = user.get("wallets", [])
+    if not (0 <= idx < len(wallets)) or not name:
+        raise HTTPException(400, "РќРµРІРµСЂРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹")
+    wallets[idx]["name"] = name
+    return {"ok": True}
 
 
 # в”Ђв”Ђ API: РїРµСЂРµРІРѕРґС‹ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
