@@ -339,6 +339,10 @@ textarea.input{resize:vertical;min-height:76px;line-height:1.5}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wallet-check{color:var(--accent);flex-shrink:0}
 .wallet-check svg{width:22px;height:22px}
+.wallet-del{color:var(--hint);flex-shrink:0;background:none;border:none;padding:6px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border-radius:50%}
+.wallet-del:active{background:var(--red-soft);color:var(--red)}
+.wallet-del svg{width:19px;height:19px}
 
 /* ═════════════ Liquid Glass (iOS 26) ═════════════ */
 :root{
@@ -1489,6 +1493,9 @@ async function loadWallets() {
 function renderWalletList() {
   const el = document.getElementById("wallets-list");
   const check = `<span class="wallet-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>`;
+  const delBtn = (idx) => `<button class="wallet-del" onclick="event.stopPropagation(); deleteWallet(${idx})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/><path d="M10 11v6M14 11v6"/></svg>
+    </button>`;
   el.innerHTML = (state.wallets || []).map((w, i) => `
     <div class="wallet-row" style="animation-delay:${i * 45}ms" onclick="switchWallet(${w.index})">
       <div class="wallet-av">${(String(w.name).match(/\d+/) || ["●"])[0]}</div>
@@ -1497,7 +1504,47 @@ function renderWalletList() {
         <div class="wallet-row-addr">${w.address ? w.address.slice(0, 20) + "…" : ""}</div>
       </div>
       ${w.active ? check : ""}
+      ${delBtn(w.index)}
     </div>`).join("");
+}
+
+// Подтверждение через нативный диалог Telegram Mini App (если доступен),
+// иначе обычный window.confirm — например, при открытии в браузере.
+function confirmDialog(message) {
+  return new Promise((resolve) => {
+    // tg.showConfirm существует как метод-заглушка даже вне настоящего
+    // Telegram-клиента и там никогда не вызывает колбэк — используем его
+    // только когда реально запущены внутри Telegram (есть initData).
+    if (initData && tg?.showConfirm) {
+      try { tg.showConfirm(message, (ok) => resolve(!!ok)); }
+      catch (_) { resolve(window.confirm(message)); }
+    } else {
+      resolve(window.confirm(message));
+    }
+  });
+}
+
+async function deleteWallet(idx) {
+  const w = (state.wallets || []).find((x) => x.index === idx);
+  const name = w ? w.name : `Кошелёк ${idx + 1}`;
+  const ok = await confirmDialog(
+    `Удалить «${name}»? Это действие нельзя отменить — убедитесь, что seed-фраза сохранена отдельно.`
+  );
+  if (!ok) return;
+  try {
+    const d = await api("POST", "/api/wallets/delete", { index: idx });
+    state.wallet = d;
+    await loadWallets();
+    if (d.wallets_left === 0) {
+      closeSheets();
+      showScreen("connect");
+      toast("Кошелёк удалён", "ok");
+      return;
+    }
+    renderWalletList();
+    showApp();
+    toast("Кошелёк удалён", "ok");
+  } catch (e) { toast(e.message, "err"); }
 }
 // ── Профиль пользователя (имя/фото из Telegram, учёт seed-фраз) ──
 let _profile = null;
@@ -1628,6 +1675,7 @@ async function submitImport() {
     await loadWallets();
     renderWalletList();
     walletSheetView("list");
+    closeSheets();
     showApp();
     toast(d.real_mode ? "Кошелёк импортирован" : "Кошелёк подключён", "ok");
   } catch (e) { toast(e.message, "err"); }

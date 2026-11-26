@@ -698,6 +698,32 @@ def _activate_wallet(user: dict, idx: int) -> None:
     stakes[user["id"]] = w.setdefault("stakes", [])
 
 
+def _remove_wallet(user: dict, idx: int) -> None:
+    """Удаляет кошелёк idx из списка (вместе с его историей и стейками —
+    они хранятся внутри самого объекта кошелька). Если удалённый кошелёк
+    был активным, активируется ближайший оставшийся; если кошельков
+    не осталось — сбрасывает пользователя в «не подключён»."""
+    wallets = user.get("wallets", [])
+    wallets.pop(idx)
+
+    if not wallets:
+        user["active"] = 0
+        user["seed"] = None
+        user["address"] = None
+        user["addresses"] = {}
+        user["balances"] = {a: 0.0 for a in ASSETS}
+        user["real_mode"] = False
+        transactions[user["id"]] = []
+        stakes[user["id"]] = []
+        return
+
+    new_active = user.get("active", 0)
+    if new_active >= idx:
+        new_active -= 1  # список сдвинулся после удаления элемента idx
+    new_active = max(0, min(new_active, len(wallets) - 1))
+    _activate_wallet(user, new_active)
+
+
 def add_tx(user_id: int, tx_type: str, asset: str, amount: float,
            address: str = "", comment: str = "", status: str = "completed") -> dict:
     tx = {
@@ -1418,6 +1444,29 @@ async def api_wallets_rename(request: Request, x_init_data: str = Header(None)):
         raise HTTPException(400, "РќРµРІРµСЂРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹")
     wallets[idx]["name"] = name
     return {"ok": True}
+
+
+@app.post("/api/wallets/delete")
+async def api_wallets_delete(request: Request, x_init_data: str = Header(None)):
+    user = auth_user(x_init_data or "")
+    body = await request.json()
+    try:
+        idx = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        idx = -1
+    wallets = user.get("wallets", [])
+    if not (0 <= idx < len(wallets)):
+        raise HTTPException(400, "Нет такого кошелька")
+    _remove_wallet(user, idx)
+    return {
+        "ok": True,
+        "connected": user["seed"] is not None,
+        "address": user["address"],
+        "addresses": user.get("addresses", {}),
+        "balances": user["balances"],
+        "real_mode": user.get("real_mode", False),
+        "wallets_left": len(user.get("wallets", [])),
+    }
 
 
 @app.get("/api/profile")
