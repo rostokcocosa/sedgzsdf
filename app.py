@@ -1642,7 +1642,6 @@ def _register_handlers(bot, dp):
             f"/start — приветствие и главное меню\n"
             f"/menu — открыть меню\n"
             f"/status — баланс кошелька\n"
-            f"/seed — информация о кошельке\n"
             f"/help — эта справка\n\n"
             f"Все операции — отправка, приём, обмен, стейкинг — выполняются "
             f"в приложении по кнопке «Открыть кошелёк»."
@@ -1791,7 +1790,6 @@ async def _configure_bot(bot) -> None:
             BotCommand(command="start",  description="Главное меню"),
             BotCommand(command="menu",   description="Открыть меню"),
             BotCommand(command="status", description="Баланс кошелька"),
-            BotCommand(command="seed",   description="Инфо о кошельке"),
             BotCommand(command="help",   description="Помощь"),
         ])
         if WEBAPP_URL.startswith("https://"):
